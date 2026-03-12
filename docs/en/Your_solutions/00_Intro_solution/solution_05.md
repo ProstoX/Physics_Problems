@@ -54,3 +54,5 @@ $$A_y = 7.5\sqrt{3}$$
 
 * The horizontal component is **7.5**.
 * The vertical component is **$7.5\sqrt{3}$** (or approximately **12.99**).
+
+*Visualization is available at [solution_05.png](solution_05.png)*

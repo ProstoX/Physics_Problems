@@ -76,3 +76,5 @@ $$y = 2$$
 ### Final Answer
 
 The dimensions of the rectangle that yield the maximum area are a **width of $1$ unit** and a **height of $2$ units**. (The maximum area itself is $1 \times 2 = 2$ square units).
+
+*Visualization is available at [solution_09.png](solution_09.png)*

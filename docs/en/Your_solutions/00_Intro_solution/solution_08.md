@@ -51,3 +51,5 @@ $$2$$
 ### Final Answer
 
 The exact area under the curve $f(x) = \sin(x)$ from $x=0$ to $x=\pi$ is **2** square units.
+
+*Visualization is available at [solution_08.png](solution_08.png)*

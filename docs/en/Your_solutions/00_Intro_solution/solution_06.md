@@ -45,3 +45,5 @@ $$f(2) = -5$$
 ### Final Answer
 
 The function has a **local minimum at $(2, -5)$**. Because it is a simple parabola, it does not have any local maxima.
+
+*Visualization is available at [solution_06.png](solution_06.png)*

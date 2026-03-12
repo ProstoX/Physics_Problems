@@ -79,3 +79,5 @@ $$y = \frac{1}{2}\ln(2)$$
 The final position of the ant on the coordinate plane is **$(\frac{\pi}{4}, \frac{1}{2}\ln(2))$**.
 
 If you prefer decimal approximations, this is roughly **(0.785, 0.347)**.
+
+*Visualization is available at [solution_10.mp4](solution_10.mp4)*
