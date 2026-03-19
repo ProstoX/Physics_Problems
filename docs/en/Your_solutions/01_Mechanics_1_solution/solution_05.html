@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>River Crossing — Relative Velocity</title>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  RIVER CROSSING · RELATIVE VELOCITY PROBLEM                     ║
+  ║                                                                  ║
+  ║  River width  : 200 m (N-S)                                     ║
+  ║  Current      : v_c = 2 m/s East                                ║
+  ║  Boat (water) : v_b = 5 m/s, must aim West-of-North            ║
+  ║                                                                  ║
+  ║  Heading angle west of North:                                    ║
+  ║    sin θ = v_c / v_b = 2/5  →  θ ≈ 23.578°                     ║
+  ║                                                                  ║
+  ║  Resultant northward speed:                                      ║
+  ║    v_N = √(5² − 2²) = √21 ≈ 4.583 m/s                         ║
+  ║                                                                  ║
+  ║  Time of crossing:                                              ║
+  ║    T = 200 / √21 ≈ 43.64 s                                      ║
+  ╚══════════════════════════════════════════════════════════════════╝
+
+  Aesthetic: Nautical chart / Admiralty map — deep ocean blues,
+  cream typography, compass-rose details, aged-paper data panels.
+  The canvas mimics a top-down hydrographic chart.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Source+Code+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════════════════════════════════════
+   RESET & DESIGN TOKENS
+══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Deep ocean chart palette */
+  --ocean-deep:  #08192b;
+  --ocean-mid:   #0d2640;
+  --ocean-surf:  #1a4a6e;
+  --ocean-light: #2a6a94;
+  --river-body:  #1a5276;
+  --river-glow:  rgba(42,106,148,0.25);
+
+  --shore-n:     #3d5a1e;   /* north / top shore (arrival) */
+  --shore-s:     #4a6e24;   /* south / bottom shore (start) */
+  --shore-sand:  #c8a96e;   /* bank colour */
+
+  --chart-bg:    #f2ead8;   /* aged parchment for panels */
+  --chart-ink:   #1a150f;   /* dark sepia ink */
+  --chart-rule:  #c4b49a;
+  --chart-mid:   #7a6a52;
+  --chart-dim:   #a89880;
+
+  /* Vector colours */
+  --vec-boat:    #f0c040;   /* gold: boat-relative-to-water (hypotenuse) */
+  --vec-current: #e05a30;   /* burnt orange: river current */
+  --vec-result:  #50e090;   /* seafoam green: resultant (North) */
+
+  /* Accent */
+  --cream:       #f5edd8;
+  --white-ice:   #d8eef8;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BODY
+══════════════════════════════════════════════════════════ */
+body {
+  background: var(--ocean-deep);
+  color: var(--cream);
+  font-family: 'Source Code Pro', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px 52px;
+  gap: 18px;
+
+  /* Subtle radial glow from centre */
+  background-image:
+    radial-gradient(ellipse at 50% 40%, rgba(26,74,110,0.4) 0%, transparent 60%);
+}
+
+/* ══════════════════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════════════════ */
+header {
+  text-align: center;
+  max-width: 1060px;
+  width: 100%;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  position: relative;
+}
+/* decorative horizontal rule lines */
+header::before, header::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,169,110,0.5), transparent);
+}
+.header-eyebrow {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--chart-mid);
+  margin-bottom: 6px;
+}
+header h1 {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--cream);
+  line-height: 1.1;
+  text-shadow: 0 0 30px rgba(200,169,110,0.3);
+}
+.header-sub {
+  margin-top: 6px;
+  font-size: 0.65rem;
+  color: var(--chart-dim);
+  letter-spacing: 0.12em;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAIN LAYOUT  ── wide canvas left, narrow panel right
+══════════════════════════════════════════════════════════ */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 264px;
+  gap: 14px;
+  width: 100%;
+  max-width: 1060px;
+  align-items: start;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CANVAS CARD
+══════════════════════════════════════════════════════════ */
+.canvas-card {
+  position: relative;
+  border: 1px solid rgba(200,169,110,0.35);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.6),
+    0 8px 40px rgba(0,0,0,0.5),
+    inset 0 0 40px rgba(0,0,0,0.3);
+}
+canvas { display: block; width: 100%; height: auto; }
+
+/* Compass rose — CSS only, top-right corner of canvas card */
+.compass {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 54px; height: 54px;
+  pointer-events: none;
+}
+.compass svg { width: 100%; height: 100%; }
+
+/* ══════════════════════════════════════════════════════════
+   RIGHT PANEL
+══════════════════════════════════════════════════════════ */
+.side { display: flex; flex-direction: column; gap: 12px; }
+
+/* Chart-paper card */
+.chart-card {
+  background: var(--chart-bg);
+  border: 1px solid var(--chart-rule);
+  border-radius: 3px;
+  padding: 13px 15px;
+  box-shadow:
+    2px 2px 0 var(--chart-rule),
+    0 4px 16px rgba(0,0,0,0.4);
+  /* aged vellum feel */
+  background-image:
+    repeating-linear-gradient(
+      0deg, transparent, transparent 18px,
+      rgba(0,0,0,0.03) 18px, rgba(0,0,0,0.03) 19px
+    );
+}
+.chart-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--chart-ink);
+  padding-bottom: 9px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--chart-rule);
+}
+
+/* ── Telemetry readout ──────────────────────────────────── */
+.telem { display: flex; flex-direction: column; gap: 6px; }
+
+.telem-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+  gap: 8px;
+}
+.telem-row.divider {
+  border-top: 1px solid var(--chart-rule);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.t-key {
+  font-size: 0.62rem;
+  color: var(--chart-mid);
+  font-family: 'Cinzel', serif;
+  white-space: nowrap;
+}
+.t-val {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--chart-ink);
+  text-align: right;
+  font-family: 'Source Code Pro', monospace;
+}
+.t-val.big {
+  font-size: 1.45rem;
+  font-weight: 400;
+  font-family: 'Cinzel', serif;
+  color: var(--ocean-mid);
+  line-height: 1;
+}
+.t-val.highlight { color: var(--river-body); font-weight: 600; }
+
+/* Progress bar for distance */
+.prog-wrap {
+  margin-top: 6px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.prog-labels {
+  display: flex; justify-content: space-between;
+  font-size: 0.58rem; color: var(--chart-dim);
+}
+.prog-track {
+  height: 6px;
+  background: var(--chart-rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--ocean-surf), var(--ocean-light));
+  width: 0%;
+  transition: width 0.06s linear;
+}
+
+/* ── Vector legend ──────────────────────────────────────── */
+.legend { display: flex; flex-direction: column; gap: 10px; }
+.leg-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 0.7rem; color: var(--chart-ink);
+  line-height: 1.4;
+}
+.leg-swatch {
+  display: flex; align-items: center; gap: 0;
+  flex-shrink: 0; margin-top: 3px;
+}
+.leg-shaft { height: 2.5px; border-radius: 1px; flex-shrink: 0; }
+.leg-head  {
+  width: 0; height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  flex-shrink: 0;
+}
+.leg-dot   { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.leg-sub   { font-size: 0.58rem; color: var(--chart-mid); display: block; margin-top: 1px; }
+
+/* ── Calculated values ──────────────────────────────────── */
+.calc-block { display: flex; flex-direction: column; gap: 5px; }
+.calc-row {
+  display: flex; justify-content: space-between;
+  align-items: baseline; gap: 8px;
+  font-size: 0.68rem;
+}
+.calc-row .ck { color: var(--chart-mid); font-style: italic; font-family: 'Cinzel', serif; font-size: 0.62rem; }
+.calc-row .cv { color: var(--chart-ink); font-weight: 500; }
+
+/* ── Button ─────────────────────────────────────────────── */
+#startBtn {
+  width: 100%;
+  padding: 13px 0;
+  background: var(--ocean-mid);
+  border: 1px solid rgba(200,169,110,0.5);
+  border-radius: 3px;
+  color: var(--cream);
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+}
+#startBtn:hover  { background: var(--ocean-surf); box-shadow: 2px 2px 0 rgba(0,0,0,0.4), 0 0 16px rgba(42,106,148,0.4); }
+#startBtn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 rgba(0,0,0,0.4); }
+#startBtn.running { background: #3d1a0a; border-color: rgba(224,90,48,0.5); color: #f5c5a0; }
+
+/* ══════════════════════════════════════════════════════════
+   BOTTOM FORMULA BAR
+══════════════════════════════════════════════════════════ */
+.formula-bar {
+  width: 100%;
+  max-width: 1060px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.formula-cell {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 3px;
+  padding: 9px 12px;
+  font-size: 0.68rem;
+  line-height: 1.7;
+  color: var(--chart-dim);
+}
+.formula-cell .fc-head {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream);
+  display: block;
+  margin-bottom: 2px;
+  opacity: 0.7;
+}
+.formula-cell code {
+  font-family: 'Source Code Pro', monospace;
+  color: var(--white-ice);
+  font-size: 0.72rem;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ═══════════ HEADER ══════════════════════════════════════ -->
+<header>
+  <div class="header-eyebrow">Relative Velocity · 2D Vector Analysis · Top-Down Chart View</div>
+  <h1>River Crossing Navigation</h1>
+  <div class="header-sub">River 200 m wide · current 2 m/s East · boat 5 m/s · heading ~23.6° W of N</div>
+</header>
+
+<!-- ═══════════ MAIN LAYOUT ════════════════════════════════ -->
+<div class="layout">
+
+  <!-- ── Canvas ─────────────────────────────────────────── -->
+  <div class="canvas-card">
+    <canvas id="c"></canvas>
+
+    <!-- Compass rose overlay -->
+    <div class="compass">
+      <svg viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">
+        <!-- outer ring -->
+        <circle cx="27" cy="27" r="25" fill="rgba(8,25,43,0.85)" stroke="rgba(200,169,110,0.5)" stroke-width="1"/>
+        <!-- N/S/E/W arms -->
+        <polygon points="27,4 29.5,27 27,22 24.5,27" fill="#f5edd8" opacity="0.9"/>
+        <polygon points="27,50 24.5,27 27,32 29.5,27" fill="rgba(245,237,216,0.35)"/>
+        <polygon points="4,27 27,24.5 22,27 27,29.5"  fill="rgba(245,237,216,0.35)"/>
+        <polygon points="50,27 27,29.5 32,27 27,24.5"  fill="rgba(245,237,216,0.35)"/>
+        <!-- centre dot -->
+        <circle cx="27" cy="27" r="2.5" fill="rgba(200,169,110,0.8)"/>
+        <!-- N label -->
+        <text x="27" y="18" text-anchor="middle" fill="#f5edd8" font-family="Cinzel,serif" font-size="6" font-weight="600" opacity="0.9">N</text>
+        <text x="27" y="39" text-anchor="middle" fill="rgba(245,237,216,0.4)" font-family="Cinzel,serif" font-size="5">S</text>
+        <text x="10" y="30" text-anchor="middle" fill="rgba(245,237,216,0.4)" font-family="Cinzel,serif" font-size="5">W</text>
+        <text x="44" y="30" text-anchor="middle" fill="rgba(245,237,216,0.4)" font-family="Cinzel,serif" font-size="5">E</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── Right panel ──────────────────────────────────────── -->
+  <div class="side">
+
+    <!-- Telemetry -->
+    <div class="chart-card">
+      <div class="chart-title">Navigation Log</div>
+      <div class="telem">
+        <div class="telem-row">
+          <span class="t-key">Elapsed</span>
+          <span class="t-val big" id="vTime">0.00<span style="font-size:0.7rem"> s</span></span>
+        </div>
+        <div class="telem-row">
+          <span class="t-key">Heading</span>
+          <span class="t-val" id="vAngle">23.58° W of N</span>
+        </div>
+        <div class="telem-row">
+          <span class="t-key">Northing</span>
+          <span class="t-val highlight" id="vDist">0.00 m</span>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="prog-wrap">
+        <div class="prog-labels">
+          <span>South shore</span>
+          <span id="progPct">0%</span>
+          <span>North shore</span>
+        </div>
+        <div class="prog-track">
+          <div class="prog-fill" id="progFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vector Legend -->
+    <div class="chart-card">
+      <div class="chart-title">Vector Key</div>
+      <div class="legend">
+
+        <div class="leg-item">
+          <div class="leg-swatch">
+            <div class="leg-shaft" style="width:18px;background:#f0c040"></div>
+            <div class="leg-head"  style="border-left:6px solid #f0c040"></div>
+          </div>
+          <div>
+            Boat ∥ Water
+            <span class="leg-sub">v<sub>BW</sub> = 5 m/s · heading</span>
+          </div>
+        </div>
+
+        <div class="leg-item">
+          <div class="leg-swatch">
+            <div class="leg-shaft" style="width:18px;background:#e05a30"></div>
+            <div class="leg-head"  style="border-left:6px solid #e05a30"></div>
+          </div>
+          <div>
+            River Current
+            <span class="leg-sub">v<sub>R</sub> = 2 m/s East</span>
+          </div>
+        </div>
+
+        <div class="leg-item">
+          <div class="leg-swatch">
+            <div class="leg-shaft" style="width:18px;background:#50e090"></div>
+            <div class="leg-head"  style="border-left:6px solid #50e090"></div>
+          </div>
+          <div>
+            Resultant (Ground)
+            <span class="leg-sub">v<sub>BG</sub> = √21 ≈ 4.58 m/s N</span>
+          </div>
+        </div>
+
+        <div class="leg-item" style="margin-top:2px">
+          <div class="leg-dot" style="background:#f5edd8;border:2px solid rgba(245,237,216,0.5);margin-top:2px;width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
+          <div>
+            Boat
+            <span class="leg-sub">nose angled 23.58° W of N</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Calculated quantities -->
+    <div class="chart-card">
+      <div class="chart-title">Derived Values</div>
+      <div class="calc-block">
+        <div class="calc-row">
+          <span class="ck">sin θ</span>
+          <span class="cv">= v<sub>R</sub>/v<sub>BW</sub> = 2/5</span>
+        </div>
+        <div class="calc-row">
+          <span class="ck">θ</span>
+          <span class="cv">≈ 23.578° W of N</span>
+        </div>
+        <div class="calc-row">
+          <span class="ck">v<sub>N</sub></span>
+          <span class="cv">= √21 ≈ 4.583 m/s</span>
+        </div>
+        <div class="calc-row">
+          <span class="ck">T</span>
+          <span class="cv">= 200/√21 ≈ 43.64 s</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Button -->
+    <button id="startBtn">⚓ Start Crossing</button>
+
+  </div><!-- /side -->
+</div>
+
+<!-- ═══════════ FORMULA BAR ════════════════════════════════ -->
+<div class="formula-bar">
+  <div class="formula-cell">
+    <span class="fc-head">Condition</span>
+    <code>v_BW · sin θ = v_R</code><br>
+    boat cancels drift
+  </div>
+  <div class="formula-cell">
+    <span class="fc-head">Heading</span>
+    <code>θ = arcsin(2/5)</code><br>
+    <code>≈ 23.578°</code> W of N
+  </div>
+  <div class="formula-cell">
+    <span class="fc-head">Northward Speed</span>
+    <code>v_N = √(5²−2²)</code><br>
+    <code>= √21 ≈ 4.583 m/s</code>
+  </div>
+  <div class="formula-cell">
+    <span class="fc-head">Crossing Time</span>
+    <code>T = 200 / √21</code><br>
+    <code>≈ 43.64 s</code>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════
+     JAVASCRIPT
+═════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ──────────────────────────────────────────────────────────
+     §1  PHYSICS CONSTANTS
+  ────────────────────────────────────────────────────────── */
+
+  const RIVER_W   = 200;              // m, North–South width
+  const V_CURRENT = 2;                // m/s, East (river current)
+  const V_BOAT    = 5;                // m/s, boat through water
+
+  // Heading west of North so that current cancels eastward drift
+  // sin θ = V_CURRENT / V_BOAT  →  θ = arcsin(2/5)
+  const THETA     = Math.asin(V_CURRENT / V_BOAT);   // rad west-of-north
+
+  // Components of boat-through-water in world frame (West is −x, North is +y)
+  const VBW_X     = -V_BOAT * Math.sin(THETA);       // westward component (negative x)
+  const VBW_Y     =  V_BOAT * Math.cos(THETA);       // northward component
+
+  // Resultant velocity over ground (current exactly cancels westward drift)
+  const V_NORTH   = Math.sqrt(V_BOAT * V_BOAT - V_CURRENT * V_CURRENT); // ≈ 4.583
+  const T_TOTAL   = RIVER_W / V_NORTH;               // ≈ 43.64 s
+
+  /* ──────────────────────────────────────────────────────────
+     §2  CANVAS SETUP
+  ────────────────────────────────────────────────────────── */
+
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+
+  // Logical resolution
+  const CW = 760, CH = 580;
+  canvas.width = CW; canvas.height = CH;
+
+  // Layout zones (canvas pixels)
+  const SHORE_H = 50;                         // height of each shore strip
+  const RIVER_TOP    = SHORE_H;               // y of north shore edge (canvas)
+  const RIVER_BOTTOM = CH - SHORE_H;          // y of south shore edge (canvas)
+  const RIVER_HEIGHT = RIVER_BOTTOM - RIVER_TOP; // pixels for river body
+
+  // River horizontal range — river is wide (East-West), wider than 200 m display
+  const RIVER_LEFT  = 30;
+  const RIVER_RIGHT = CW - 30;
+  const RIVER_PXWIDTH = RIVER_RIGHT - RIVER_LEFT;
+
+  // Boat's fixed x position (canvas) — stays centred because it drifts exactly 0m East
+  const BOAT_X_CANVAS = RIVER_LEFT + RIVER_PXWIDTH / 2;
+
+  // Convert world-y (0 = south shore, 200 = north shore) → canvas-y
+  function worldToCanvas(yWorld) {
+    // 0 → RIVER_BOTTOM, 200 → RIVER_TOP
+    return RIVER_BOTTOM - (yWorld / RIVER_W) * RIVER_HEIGHT;
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §3  CURRENT RIPPLE ANIMATION STATE
+     We draw 20 equally-spaced ripple lines that scroll eastward.
+  ────────────────────────────────────────────────────────── */
+
+  const N_RIPPLES = 22;
+  const RIPPLE_SPACING = RIVER_PXWIDTH / N_RIPPLES;
+
+  // Scroll speed in canvas pixels per second (scaled to look nice)
+  // Real: 2 m/s across 200 m river = 1% of width per second
+  // Visual: let's make it 12 px/s
+  const RIPPLE_PX_PER_S = 18;
+
+  let rippleOffset = 0;   // current scroll offset in pixels [0, RIPPLE_SPACING)
+
+  /* ──────────────────────────────────────────────────────────
+     §4  BOAT TRAIL
+  ────────────────────────────────────────────────────────── */
+
+  let trail = [];        // array of canvas {x, y}
+  const TRAIL_MAX = 120;
+
+  /* ──────────────────────────────────────────────────────────
+     §5  DRAW — SHORES
+  ────────────────────────────────────────────────────────── */
+
+  function drawShores() {
+    // South shore (start) — earthy green-brown
+    const gradS = ctx.createLinearGradient(0, RIVER_BOTTOM, 0, CH);
+    gradS.addColorStop(0, '#3d5a1e');
+    gradS.addColorStop(1, '#2a3d12');
+    ctx.fillStyle = gradS;
+    ctx.fillRect(0, RIVER_BOTTOM, CW, SHORE_H);
+
+    // North shore (destination)
+    const gradN = ctx.createLinearGradient(0, 0, 0, RIVER_TOP);
+    gradN.addColorStop(0, '#2a3d12');
+    gradN.addColorStop(1, '#3d5a1e');
+    ctx.fillStyle = gradN;
+    ctx.fillRect(0, 0, CW, RIVER_TOP);
+
+    // Shore labels
+    ctx.fillStyle = 'rgba(245,237,216,0.45)';
+    ctx.font      = '500 11px "Source Code Pro", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('SOUTH SHORE  ▶  START', RIVER_LEFT + 8, CH - 17);
+    ctx.fillText('NORTH SHORE  ▶  DESTINATION', RIVER_LEFT + 8, 18);
+
+    // Thin beach / sand lines at water edge
+    ctx.strokeStyle = 'rgba(200,169,110,0.3)';
+    ctx.lineWidth   = 1;
+    ctx.beginPath(); ctx.moveTo(RIVER_LEFT, RIVER_TOP);    ctx.lineTo(RIVER_RIGHT, RIVER_TOP);    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(RIVER_LEFT, RIVER_BOTTOM); ctx.lineTo(RIVER_RIGHT, RIVER_BOTTOM); ctx.stroke();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §6  DRAW — RIVER BODY
+  ────────────────────────────────────────────────────────── */
+
+  function drawRiver() {
+    // Main body gradient (darker at edges, lighter in middle)
+    const grad = ctx.createLinearGradient(RIVER_LEFT, RIVER_TOP, RIVER_LEFT, RIVER_BOTTOM);
+    grad.addColorStop(0,   '#0d2640');
+    grad.addColorStop(0.15,'#1a4a6e');
+    grad.addColorStop(0.5, '#1e5278');
+    grad.addColorStop(0.85,'#1a4a6e');
+    grad.addColorStop(1,   '#0d2640');
+    ctx.fillStyle = grad;
+    ctx.fillRect(RIVER_LEFT, RIVER_TOP, RIVER_PXWIDTH, RIVER_HEIGHT);
+
+    // Depth label
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.font      = 'bold 48px "Cinzel", serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('200 m', CW / 2, (RIVER_TOP + RIVER_BOTTOM) / 2 + 18);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §7  DRAW — ANIMATED CURRENT RIPPLES
+  ────────────────────────────────────────────────────────── */
+
+  function drawCurrentRipples(offset) {
+    // Clip to river rectangle
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(RIVER_LEFT, RIVER_TOP, RIVER_PXWIDTH, RIVER_HEIGHT);
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(100,200,240,0.1)';
+    ctx.lineWidth   = 1;
+
+    // Draw N_RIPPLES+2 lines so scrolling wraps seamlessly
+    for (let i = -1; i <= N_RIPPLES + 1; i++) {
+      const x = RIVER_LEFT + (i * RIPPLE_SPACING + offset) % RIVER_PXWIDTH;
+
+      // Wavy ripple: a short bezier undulation
+      ctx.beginPath();
+      const seg = RIVER_HEIGHT / 5;
+      ctx.moveTo(x, RIVER_TOP);
+      for (let s = 0; s < 5; s++) {
+        const y0 = RIVER_TOP + s * seg;
+        const y1 = RIVER_TOP + (s + 1) * seg;
+        const wave = (s % 2 === 0) ? 5 : -5;
+        ctx.bezierCurveTo(x + wave, y0 + seg * 0.33, x + wave, y0 + seg * 0.66, x, y1);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // "CURRENT →" label with arrow
+    ctx.fillStyle = 'rgba(100,200,240,0.25)';
+    ctx.font      = '9px "Source Code Pro", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('CURRENT  ▶  2 m/s E', RIVER_LEFT + 8, RIVER_BOTTOM - 10);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §8  DRAW — VECTOR ARROWS
+     Attached to the boat at (bx, by) in canvas coords.
+     Vectors are in world m/s but we need canvas pixels.
+
+     Scale factor: how many canvas-pixels per world m/s
+     River height = RIVER_HEIGHT px = 200 m
+     1 m/s corresponds to: let's show arrows as fixed fraction of
+     river height for readability.
+  ────────────────────────────────────────────────────────── */
+
+  // Arrow scale: 1 m/s = ARROW_SCALE canvas pixels
+  const ARROW_SCALE = RIVER_HEIGHT * 0.12;   // 12% of river height per m/s → clean arrows
+
+  /**
+   * Draw a labelled vector arrow.
+   * @param {number} bx   base canvas x
+   * @param {number} by   base canvas y
+   * @param {number} dvx  vector x component (world, m/s) — East is positive
+   * @param {number} dvy  vector y component (world, m/s) — North is positive
+   * @param {string} color
+   * @param {string} label
+   */
+  function drawVector(bx, by, dvx, dvy, color, label) {
+    // Canvas coords: East → +x, North → −y (y-axis flipped)
+    const tipX = bx + dvx *  ARROW_SCALE;
+    const tipY = by + dvy * -ARROW_SCALE;   // negate because canvas y is down
+
+    const dx = tipX - bx, dy = tipY - by;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 2) return;  // skip degenerate arrows
+
+    // Shaft
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 8;
+
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+
+    // Arrowhead
+    const angle  = Math.atan2(dy, dx);
+    const hLen   = 12;
+    const hAngle = 0.36;
+
+    ctx.fillStyle   = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 6;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - hLen * Math.cos(angle - hAngle), tipY - hLen * Math.sin(angle - hAngle));
+    ctx.lineTo(tipX - hLen * Math.cos(angle + hAngle), tipY - hLen * Math.sin(angle + hAngle));
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+    // Label — placed near tip, perpendicular offset
+    const nx = -(dy / len), ny = dx / len;   // unit normal
+    const lx = bx + dx * 0.65 + nx * 16;
+    const ly = by + dy * 0.65 + ny * 16;
+    ctx.fillStyle = color;
+    ctx.font      = '500 10px "Source Code Pro", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, lx, ly);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §9  DRAW — BOAT SHAPE
+     The boat is a small teardrop/hull shape rotated to heading.
+     Heading: THETA west of north.
+     North = angle 270° (−π/2) in canvas convention (canvas y is down).
+     West-of-north = rotate left by THETA.
+  ────────────────────────────────────────────────────────── */
+
+  function drawBoat(bx, by) {
+    // In canvas: north = -y direction = angle -π/2
+    // West-of-north = rotate clockwise by THETA in world = counter-clockwise in canvas
+    // Bow is drawn at local (0, -16) = local -y = canvas "up" = North before rotation.
+    // To aim THETA west of North we only need to rotate by -THETA (counter-clockwise).
+    // The previous -π/2 offset was incorrect and caused a 90° misalignment.
+    const headingCanvas = -THETA;
+
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(headingCanvas);
+
+    // Hull — elongated teardrop: pointed bow forward (+y in local), wider stern
+    ctx.fillStyle   = '#e8e0d0';
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth   = 1;
+    ctx.shadowColor = 'rgba(255,255,255,0.3)';
+    ctx.shadowBlur  = 6;
+
+    ctx.beginPath();
+    // Bow (front, local +y = forward)
+    ctx.moveTo(0, -16);
+    ctx.bezierCurveTo( 6, -10,  8,  0,  6,  8);
+    ctx.lineTo(0, 10);
+    ctx.lineTo(-6, 8);
+    ctx.bezierCurveTo(-8,  0, -6, -10, 0, -16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // Cabin / deck
+    ctx.fillStyle = 'rgba(30,64,80,0.8)';
+    ctx.beginPath();
+    ctx.ellipse(0, -2, 3.5, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wake lines behind stern
+    ctx.strokeStyle = 'rgba(200,230,255,0.3)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([3, 4]);
+    for (let w = 1; w <= 2; w++) {
+      ctx.beginPath();
+      ctx.moveTo(-5 * w, 10);
+      ctx.quadraticCurveTo(-8 * w, 22, 0, 28 + w * 4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(5 * w, 10);
+      ctx.quadraticCurveTo(8 * w, 22, 0, 28 + w * 4);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    ctx.restore();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §10  DRAW — TRAIL
+  ────────────────────────────────────────────────────────── */
+
+  function drawTrail() {
+    if (trail.length < 2) return;
+    for (let i = 1; i < trail.length; i++) {
+      const alpha = (i / trail.length) * 0.4;
+      ctx.strokeStyle = `rgba(80,224,144,${alpha})`;
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(trail[i-1].x, trail[i-1].y);
+      ctx.lineTo(trail[i].x,   trail[i].y);
+      ctx.stroke();
+    }
+    // Dashed plumb line (true North track)
+    if (simTime > 0) {
+      const topY = worldToCanvas(RIVER_W);
+      ctx.strokeStyle = 'rgba(80,224,144,0.15)';
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(BOAT_X_CANVAS, RIVER_BOTTOM);
+      ctx.lineTo(BOAT_X_CANVAS, topY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §11  DRAW — VECTOR LEGEND OVERLAY (in canvas, top-left)
+     Small velocity triangle diagram drawn in the water.
+  ────────────────────────────────────────────────────────── */
+
+  function drawDiagram() {
+    // Small parallelogram vector diagram in bottom-left of river
+    const ox = RIVER_LEFT + 28, oy = RIVER_BOTTOM - 60;
+    const SCALE = 10;  // pixels per m/s
+
+    ctx.save();
+    // Semi-transparent backdrop
+    ctx.fillStyle = 'rgba(8,25,43,0.7)';
+    ctx.strokeStyle = 'rgba(200,169,110,0.25)';
+    ctx.lineWidth = 1;
+    const bw = 120, bh = 80;
+    ctx.beginPath();
+    ctx.roundRect(ox - 10, oy - 62, bw, bh, 4);
+    ctx.fill(); ctx.stroke();
+
+    // Diagram title
+    ctx.fillStyle = 'rgba(245,237,216,0.4)';
+    ctx.font      = '8px "Cinzel", serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('VECTOR DIAGRAM', ox - 4, oy - 50);
+
+    // Origin of diagram
+    const dx = ox + 15, dy = oy - 15;
+
+    // Current vector (East, orange)
+    ctx.strokeStyle = '#e05a30'; ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#e05a30'; ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx + V_CURRENT * SCALE, dy); ctx.stroke();
+    _arrowHead(dx + V_CURRENT * SCALE, dy, 0, '#e05a30');
+    ctx.fillStyle = '#e05a30'; ctx.font = '8px "Source Code Pro"'; ctx.textAlign = 'center';
+    ctx.fillText('v_R', dx + V_CURRENT * SCALE / 2, dy + 10);
+
+    // Boat-through-water (gold, going mostly north + slightly west)
+    // In diagram: start at origin, north = up (−y), west = left (−x)
+    const bbx = dx + VBW_X * SCALE;   // VBW_X is negative (west)
+    const bby = dy - VBW_Y * SCALE;   // north = up = −y in canvas
+    ctx.strokeStyle = '#f0c040'; ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#f0c040'; ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(bbx, bby); ctx.stroke();
+    _arrowHead(bbx, bby, Math.atan2(bby - dy, bbx - dx), '#f0c040');
+    ctx.fillStyle = '#f0c040'; ctx.textAlign = 'left';
+    ctx.fillText('v_BW', bbx - 22, bby - 4);
+
+    // Resultant (green, straight north)
+    const rbx = dx, rby = dy - V_NORTH * SCALE;
+    ctx.strokeStyle = '#50e090'; ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#50e090'; ctx.shadowBlur = 4;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(rbx, rby); ctx.stroke();
+    ctx.setLineDash([]);
+    _arrowHead(rbx, rby, -Math.PI / 2, '#50e090');
+    ctx.fillStyle = '#50e090'; ctx.textAlign = 'right';
+    ctx.fillText('v_BG', rbx - 4, rby + 8);
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  function _arrowHead(tx, ty, angle, color) {
+    const hLen = 6, hA = 0.4;
+    ctx.fillStyle   = color;
+    ctx.shadowColor = color;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - hLen * Math.cos(angle - hA), ty - hLen * Math.sin(angle - hA));
+    ctx.lineTo(tx - hLen * Math.cos(angle + hA), ty - hLen * Math.sin(angle + hA));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §12  FULL COMPOSITE RENDER
+  ────────────────────────────────────────────────────────── */
+
+  function render(simT, rippleOff) {
+    // Clear
+    ctx.clearRect(0, 0, CW, CH);
+
+    // Layers
+    drawShores();
+    drawRiver();
+    drawCurrentRipples(rippleOff);
+    drawDiagram();
+
+    // Boat position
+    const yWorld  = V_NORTH * simT;             // northward distance
+    const bx      = BOAT_X_CANVAS;
+    const by      = worldToCanvas(yWorld);
+
+    drawTrail();
+
+    // Draw the three vectors
+    // v_BW: boat-through-water (gold) — angled NW
+    drawVector(bx, by,  VBW_X, VBW_Y, '#f0c040', 'v_BW');
+
+    // v_R: current (orange) — due East
+    drawVector(bx, by,  V_CURRENT, 0, '#e05a30', 'v_R');
+
+    // v_BG: resultant (green) — due North
+    drawVector(bx, by,  0, V_NORTH, '#50e090', 'v_BG');
+
+    // Boat (drawn on top of vectors)
+    drawBoat(bx, by);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §13  HUD DOM UPDATES
+  ────────────────────────────────────────────────────────── */
+
+  const elTime  = document.getElementById('vTime');
+  const elAngle = document.getElementById('vAngle');
+  const elDist  = document.getElementById('vDist');
+  const elProg  = document.getElementById('progFill');
+  const elPct   = document.getElementById('progPct');
+
+  function updateHUD(t) {
+    const yWorld = Math.min(V_NORTH * t, RIVER_W);
+    const pct    = yWorld / RIVER_W * 100;
+
+    elTime.innerHTML  = `${t.toFixed(2)}<span style="font-size:0.7rem"> s</span>`;
+    elAngle.textContent = `23.58° W of N`;
+    elDist.textContent  = `${yWorld.toFixed(2)} m`;
+    elProg.style.width  = `${pct.toFixed(1)}%`;
+    elPct.textContent   = `${pct.toFixed(0)}%`;
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §14  ANIMATION LOOP
+  ────────────────────────────────────────────────────────── */
+
+  let animId   = null;
+  let simTime  = 0;
+  let lastTS   = null;
+  let running  = false;
+
+  const SIM_SPEED = 0.7;   // factor of real-time (slower = easier to see)
+
+  function tick(ts) {
+    if (lastTS === null) { lastTS = ts; animId = requestAnimationFrame(tick); return; }
+    const dtReal = Math.min((ts - lastTS) / 1000, 0.05);
+    lastTS = ts;
+
+    // Advance sim time
+    simTime  += dtReal * SIM_SPEED;
+    rippleOffset = (rippleOffset + RIPPLE_PX_PER_S * dtReal) % RIPPLE_SPACING;
+
+    // Add trail point
+    const bx = BOAT_X_CANVAS;
+    const by = worldToCanvas(V_NORTH * simTime);
+    trail.push({ x: bx, y: by });
+    if (trail.length > TRAIL_MAX) trail.shift();
+
+    // Clamp at crossing
+    if (simTime >= T_TOTAL) {
+      simTime = T_TOTAL;
+      render(simTime, rippleOffset);
+      updateHUD(simTime);
+      running = false;
+      startBtn.textContent = '↺  Reset Crossing';
+      startBtn.classList.remove('running');
+      return; // stop
+    }
+
+    render(simTime, rippleOffset);
+    updateHUD(simTime);
+
+    animId = requestAnimationFrame(tick);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §15  BUTTON CONTROL
+  ────────────────────────────────────────────────────────── */
+
+  const startBtn = document.getElementById('startBtn');
+
+  function fullReset() {
+    cancelAnimationFrame(animId); animId = null;
+    simTime = 0; lastTS = null; running = false;
+    rippleOffset = 0; trail = [];
+    render(0, 0);
+    updateHUD(0);
+    startBtn.textContent = '⚓ Start Crossing';
+    startBtn.classList.remove('running');
+  }
+
+  startBtn.addEventListener('click', () => {
+    if (running) return;
+    // If finished, reset first
+    if (simTime >= T_TOTAL) { fullReset(); return; }
+    running = true;
+    startBtn.textContent = '⛵ Crossing…';
+    startBtn.classList.add('running');
+    lastTS = null;
+    animId = requestAnimationFrame(tick);
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     §16  INITIAL STATIC FRAME
+  ────────────────────────────────────────────────────────── */
+
+  render(0, 0);
+  updateHUD(0);
+
+})();
+</script>
+</body>
+</html>

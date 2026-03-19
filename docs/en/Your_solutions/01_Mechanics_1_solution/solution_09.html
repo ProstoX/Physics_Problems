@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Momentum — Fly vs. Tennis Ball</title>
+
+  <!-- ── Fonts: Bebas Neue (display) + Fira Code (mono data) ── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══════════════════════════════════════════════════════
+       VARIABLES — high-contrast lab / scientific aesthetic
+    ══════════════════════════════════════════════════════ */
+    :root {
+      --bg:         #0a0a0c;
+      --surface:    #111116;
+      --card:       #16161e;
+      --border:     #242432;
+      --border-hi:  #32324a;
+      --text:       #e8e8f0;
+      --dim:        #4a4a62;
+      --mid:        #7878a0;
+      --fly-col:    #e8e8f0;      /* near-white for the fly */
+      --ball-col:   #a8ff3e;      /* neon chartreuse for tennis ball */
+      --track-fly:  rgba(232,232,240,0.04);
+      --track-ball: rgba(168,255,62,0.04);
+      --font-d:     'Bebas Neue', sans-serif;
+      --font-m:     'Fira Code', monospace;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-m);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 16px 48px;
+      gap: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PAGE HEADER
+    ══════════════════════════════════════════════════════ */
+    .page-header {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-d);
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      letter-spacing: 0.04em;
+      line-height: 0.95;
+      color: var(--text);
+    }
+
+    .page-header h1 em {
+      color: var(--ball-col);
+      font-style: normal;
+    }
+
+    .page-header .subtitle {
+      font-size: 0.62rem;
+      color: var(--dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      line-height: 1.7;
+      text-align: right;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CANVAS WRAPPER
+    ══════════════════════════════════════════════════════ */
+    .canvas-wrap {
+      width: 100%;
+      max-width: 760px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* lane labels overlaid on canvas via absolute children */
+    .lane-label {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PLAY / PAUSE CONTROL
+    ══════════════════════════════════════════════════════ */
+    .control-row {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    #btnPlay {
+      background: none;
+      border: 1px solid var(--border-hi);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-m);
+      font-size: 0.72rem;
+      padding: 8px 18px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: border-color 0.18s, color 0.18s, box-shadow 0.18s;
+    }
+    #btnPlay:hover {
+      border-color: var(--ball-col);
+      color: var(--ball-col);
+      box-shadow: 0 0 12px rgba(168,255,62,0.15);
+    }
+    #btnPlay.playing {
+      border-color: var(--ball-col);
+      color: var(--ball-col);
+    }
+
+    .formula-note {
+      font-size: 0.62rem;
+      color: var(--dim);
+      letter-spacing: 0.04em;
+    }
+
+    .formula-note b {
+      color: var(--mid);
+      font-weight: 500;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       DATA CARDS (two side-by-side)
+    ══════════════════════════════════════════════════════ */
+    .data-row {
+      width: 100%;
+      max-width: 760px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .data-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .data-card.fly-card   { border-top: 2px solid rgba(232,232,240,0.4); }
+    .data-card.ball-card  { border-top: 2px solid var(--ball-col); }
+
+    /* card heading */
+    .card-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .card-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-family: var(--font-d);
+      font-size: 1.25rem;
+      letter-spacing: 0.06em;
+      line-height: 1;
+    }
+
+    .fly-card  .card-title { color: var(--fly-col); }
+    .ball-card .card-title { color: var(--ball-col); }
+
+    /* kv rows */
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; row-gap: 7px; }
+    .kv-k { font-size: 0.6rem; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; align-self: center; }
+    .kv-v { font-size: 0.78rem; font-weight: 500; color: var(--text); text-align: right; }
+
+    /* momentum highlight */
+    .momentum-highlight {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .momentum-label {
+      font-size: 0.58rem;
+      color: var(--dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .momentum-value {
+      font-family: var(--font-d);
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .fly-card  .momentum-value { color: var(--fly-col); }
+    .ball-card .momentum-value { color: var(--ball-col); }
+
+    .momentum-unit {
+      font-family: var(--font-m);
+      font-size: 0.6rem;
+      color: var(--dim);
+      margin-left: 4px;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       MOMENTUM BAR CHART SECTION
+    ══════════════════════════════════════════════════════ */
+    .chart-section {
+      width: 100%;
+      max-width: 760px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-top: 12px;
+    }
+
+    .chart-section-title {
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 20px;
+    }
+
+    /* Side-by-side bar chart */
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 32px;
+      height: 140px;
+    }
+
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .bar-outer {
+      width: 100%;
+      height: 110px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 4px 4px 0 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* grid lines inside bar */
+    .bar-outer::before,
+    .bar-outer::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      border-top: 1px dashed var(--border);
+    }
+    .bar-outer::before { top: 33.3%; }
+    .bar-outer::after  { top: 66.6%; }
+
+    .bar-fill {
+      border-radius: 3px 3px 0 0;
+      transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    /* fly bar: ~33% of full height (p=0.02 out of max 0.06) */
+    .bar-fly  { height: 33.3%; background: linear-gradient(to top, rgba(232,232,240,0.9), rgba(232,232,240,0.25)); }
+    /* ball bar: 100% of full height (p=0.06) */
+    .bar-ball { height: 100%; background: linear-gradient(to top, var(--ball-col), rgba(168,255,62,0.35)); box-shadow: 0 0 20px rgba(168,255,62,0.2); }
+
+    /* value label on bar */
+    .bar-val-overlay {
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .bar-label {
+      font-size: 0.62rem;
+      color: var(--mid);
+      letter-spacing: 0.06em;
+      text-align: center;
+    }
+
+    .bar-label b {
+      display: block;
+      font-family: var(--font-d);
+      font-size: 1rem;
+      letter-spacing: 0.06em;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+
+    /* ratio annotation */
+    .ratio-note {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.62rem;
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ratio-pill {
+      background: rgba(168,255,62,0.1);
+      border: 1px solid rgba(168,255,62,0.25);
+      color: var(--ball-col);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE HEADER
+══════════════════════════════════════════════════════ -->
+<div class="page-header">
+  <h1>MOMENTUM<br /><em>p = mv</em></h1>
+  <div class="subtitle">
+    Fly &nbsp;·&nbsp; 2 g &nbsp;@&nbsp; 10 m/s<br />
+    Tennis Ball &nbsp;·&nbsp; 60 g &nbsp;@&nbsp; 1 m/s<br />
+    <span style="color:var(--mid)">which carries more momentum?</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     CANVAS
+══════════════════════════════════════════════════════ -->
+<div class="canvas-wrap">
+  <canvas id="cvs" width="760" height="200"></canvas>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     CONTROLS
+══════════════════════════════════════════════════════ -->
+<div class="control-row">
+  <button id="btnPlay">▶ &nbsp;PLAY</button>
+  <span class="formula-note">
+    Animation speed is proportional to real velocity &nbsp;·&nbsp;
+    <b>v_fly</b> = 10× <b>v_ball</b>
+  </span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     DATA CARDS
+══════════════════════════════════════════════════════ -->
+<div class="data-row">
+
+  <!-- Fly card -->
+  <div class="data-card fly-card">
+    <div class="card-heading">
+      <div class="card-icon" style="background:var(--fly-col); width:7px; height:7px;"></div>
+      <span class="card-title">FLY</span>
+    </div>
+    <div class="kv">
+      <span class="kv-k">Mass</span>        <span class="kv-v">0.002 kg</span>
+      <span class="kv-k">Velocity</span>    <span class="kv-v">10 m/s</span>
+    </div>
+    <div class="momentum-highlight">
+      <span class="momentum-label">Momentum p</span>
+      <div>
+        <span class="momentum-value">0.020</span>
+        <span class="momentum-unit">kg·m/s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tennis ball card -->
+  <div class="data-card ball-card">
+    <div class="card-heading">
+      <div class="card-icon" style="background:var(--ball-col); width:14px; height:14px;"></div>
+      <span class="card-title">TENNIS BALL</span>
+    </div>
+    <div class="kv">
+      <span class="kv-k">Mass</span>        <span class="kv-v">0.060 kg</span>
+      <span class="kv-k">Velocity</span>    <span class="kv-v">1 m/s</span>
+    </div>
+    <div class="momentum-highlight">
+      <span class="momentum-label">Momentum p</span>
+      <div>
+        <span class="momentum-value">0.060</span>
+        <span class="momentum-unit">kg·m/s</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     BAR CHART
+══════════════════════════════════════════════════════ -->
+<div class="chart-section">
+  <div class="chart-section-title">Momentum Comparison &nbsp;·&nbsp; p = m × v</div>
+
+  <div class="bar-chart">
+
+    <!-- Fly bar -->
+    <div class="bar-group">
+      <div class="bar-outer">
+        <div class="bar-fill bar-fly">
+          <span class="bar-val-overlay" style="color:var(--fly-col);">0.020 kg·m/s</span>
+        </div>
+      </div>
+      <div class="bar-label">
+        <b style="color:var(--fly-col);">FLY</b>
+        0.002 kg × 10 m/s
+      </div>
+    </div>
+
+    <!-- Tennis ball bar -->
+    <div class="bar-group">
+      <div class="bar-outer">
+        <div class="bar-fill bar-ball">
+          <span class="bar-val-overlay" style="color:var(--ball-col);">0.060 kg·m/s</span>
+        </div>
+      </div>
+      <div class="bar-label">
+        <b style="color:var(--ball-col);">TENNIS BALL</b>
+        0.060 kg × 1 m/s
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Ratio note -->
+  <div class="ratio-note">
+    <span class="ratio-pill">3× more momentum</span>
+    <span>
+      Despite moving 10× faster, the fly's momentum is
+      only&nbsp;<b style="color:var(--fly-col);">0.020&nbsp;kg·m/s</b> —
+      the tennis ball carries&nbsp;<b style="color:var(--ball-col);">0.060&nbsp;kg·m/s</b>
+      due to its greater mass.
+    </span>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════ -->
+<script>
+  /* ────────────────────────────────────────────────────
+     CANVAS SETUP
+  ──────────────────────────────────────────────────── */
+  const cvs = document.getElementById('cvs');
+  const ctx = cvs.getContext('2d');
+  const W   = cvs.width;    // 760
+  const H   = cvs.height;   // 200
+
+  /* ── Track geometry ──────────────────────────────────
+     Two horizontal lanes, each centred vertically in
+     its half of the canvas.
+  ──────────────────────────────────────────────────── */
+  const TRACK_FLY  = H * 0.27;   // y-centre of fly lane
+  const TRACK_BALL = H * 0.73;   // y-centre of tennis ball lane
+  const DIVIDER_Y  = H * 0.5;    // horizontal divider between lanes
+
+  /* ── Physics constants (display / animation) ────────
+     We treat 1 px/frame as the base speed unit.
+     Ball moves at BASE_SPD px/frame; fly at 10× that.
+  ──────────────────────────────────────────────────── */
+  const BASE_SPD   = 1.4;        // tennis ball pixels/frame
+  const FLY_SPD    = BASE_SPD * 10; // fly pixels/frame (10× faster)
+
+  /* Sizes */
+  const FLY_R      = 4;          // fly dot radius (px)
+  const BALL_R     = 18;         // tennis ball radius (px)
+
+  /* ── Object positions (start off-left so they
+     "enter" the scene naturally on first play) ──── */
+  let flyX  = -FLY_R;
+  let ballX = -BALL_R;
+
+  /* ── State ── */
+  let playing = false;
+  let animId  = null;
+
+  /* ────────────────────────────────────────────────────
+     DRAW HELPERS
+  ──────────────────────────────────────────────────── */
+
+  /**
+   * Draw a single horizontal track lane background.
+   * @param {number} yCenter  - vertical centre of lane
+   * @param {string} fillCol  - subtle tinted fill
+   * @param {string} label    - lane label text
+   * @param {string} labelCol - label colour
+   */
+  function drawLane(yCenter, fillCol, label, labelCol) {
+    const laneH = H * 0.46;
+    const laneY = yCenter - laneH / 2;
+
+    /* background fill */
+    ctx.fillStyle = fillCol;
+    ctx.fillRect(0, laneY, W, laneH);
+
+    /* dashed centre rail */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([8, 10]);
+    ctx.beginPath();
+    ctx.moveTo(0, yCenter);
+    ctx.lineTo(W, yCenter);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    /* lane label (far left) */
+    ctx.save();
+    ctx.font        = '600 11px Fira Code, monospace';
+    ctx.fillStyle   = labelCol;
+    ctx.textBaseline= 'middle';
+    ctx.textAlign   = 'left';
+    ctx.fillText(label, 12, yCenter);
+    ctx.restore();
+  }
+
+  /**
+   * Draw the fly as a small crisp dot with a faint motion trail.
+   * @param {number} x
+   */
+  function drawFly(x) {
+    /* motion trail */
+    for (let i = 1; i <= 6; i++) {
+      const tx    = x - i * 8;
+      const alpha = 0.12 - i * 0.018;
+      if (tx < 0) continue;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle   = '#e8e8f0';
+      ctx.beginPath();
+      ctx.arc(tx, TRACK_FLY, FLY_R * (1 - i * 0.1), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* core dot */
+    ctx.save();
+    ctx.fillStyle   = '#f0f0f8';
+    ctx.strokeStyle = 'rgba(232,232,240,0.4)';
+    ctx.lineWidth   = 1;
+    ctx.shadowColor = 'rgba(220,220,255,0.6)';
+    ctx.shadowBlur  = 6;
+    ctx.beginPath();
+    ctx.arc(x, TRACK_FLY, FLY_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Draw the tennis ball — a textured neon-green circle.
+   * @param {number} x
+   */
+  function drawBall(x) {
+    /* subtle motion trail */
+    for (let i = 1; i <= 3; i++) {
+      const tx    = x - i * 6;
+      const alpha = 0.08 - i * 0.02;
+      if (tx < 0) continue;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle   = '#a8ff3e';
+      ctx.beginPath();
+      ctx.arc(tx, TRACK_BALL, BALL_R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* outer glow ring */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, TRACK_BALL, BALL_R + 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(168,255,62,0.08)';
+    ctx.fill();
+
+    /* main ball gradient */
+    const grd = ctx.createRadialGradient(x - BALL_R * 0.3, TRACK_BALL - BALL_R * 0.3, 1, x, TRACK_BALL, BALL_R);
+    grd.addColorStop(0.0, '#d4ff80');
+    grd.addColorStop(0.5, '#a8ff3e');
+    grd.addColorStop(1.0, '#5a9000');
+
+    ctx.beginPath();
+    ctx.arc(x, TRACK_BALL, BALL_R, 0, Math.PI * 2);
+    ctx.fillStyle   = grd;
+    ctx.shadowColor = 'rgba(168,255,62,0.5)';
+    ctx.shadowBlur  = 18;
+    ctx.fill();
+
+    /* tennis ball seam lines (two curved arcs) */
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth   = 1.5;
+    ctx.shadowBlur  = 0;
+
+    /* left seam */
+    ctx.beginPath();
+    ctx.arc(x - BALL_R * 0.15, TRACK_BALL, BALL_R * 0.65, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+    /* right seam */
+    ctx.beginPath();
+    ctx.arc(x + BALL_R * 0.15, TRACK_BALL, BALL_R * 0.65, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /* ────────────────────────────────────────────────────
+     MAIN RENDER FRAME
+  ──────────────────────────────────────────────────── */
+  function render() {
+    /* clear */
+    ctx.clearRect(0, 0, W, H);
+
+    /* canvas background */
+    ctx.fillStyle = '#111116';
+    ctx.fillRect(0, 0, W, H);
+
+    /* draw lanes */
+    drawLane(TRACK_FLY,  'rgba(232,232,240,0.025)', 'FLY  ·  10 m/s',    'rgba(232,232,240,0.25)');
+    drawLane(TRACK_BALL, 'rgba(168,255,62,0.03)',   'BALL ·  1 m/s',     'rgba(168,255,62,0.35)');
+
+    /* lane divider */
+    ctx.save();
+    ctx.strokeStyle = '#1e1e28';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, DIVIDER_Y);
+    ctx.lineTo(W, DIVIDER_Y);
+    ctx.stroke();
+    ctx.restore();
+
+    /* objects */
+    drawFly(flyX);
+    drawBall(ballX);
+
+    /* right-edge "wall" gradient — objects fade out then loop */
+    const edgeFade = ctx.createLinearGradient(W - 40, 0, W, 0);
+    edgeFade.addColorStop(0, 'rgba(17,17,22,0)');
+    edgeFade.addColorStop(1, 'rgba(17,17,22,1)');
+    ctx.fillStyle = edgeFade;
+    ctx.fillRect(W - 40, 0, 40, H);
+
+    /* left-edge fade (objects enter smoothly) */
+    const leftFade = ctx.createLinearGradient(0, 0, 28, 0);
+    leftFade.addColorStop(0, 'rgba(17,17,22,1)');
+    leftFade.addColorStop(1, 'rgba(17,17,22,0)');
+    ctx.fillStyle = leftFade;
+    ctx.fillRect(0, 0, 28, H);
+  }
+
+  /* ────────────────────────────────────────────────────
+     ANIMATION LOOP
+  ──────────────────────────────────────────────────── */
+  function step() {
+    /* advance positions */
+    flyX  += FLY_SPD;
+    ballX += BASE_SPD;
+
+    /* loop when fully past right edge */
+    if (flyX  > W + FLY_R  * 2) flyX  = -FLY_R  * 8;
+    if (ballX > W + BALL_R * 2) ballX = -BALL_R  * 3;
+
+    render();
+
+    if (playing) animId = requestAnimationFrame(step);
+  }
+
+  /* ────────────────────────────────────────────────────
+     CONTROLS
+  ──────────────────────────────────────────────────── */
+  const btnPlay = document.getElementById('btnPlay');
+
+  btnPlay.addEventListener('click', () => {
+    playing = !playing;
+    if (playing) {
+      btnPlay.textContent = '⏸ &nbsp;PAUSE';
+      btnPlay.innerHTML   = '⏸ &nbsp;PAUSE';
+      btnPlay.classList.add('playing');
+      animId = requestAnimationFrame(step);
+    } else {
+      btnPlay.innerHTML = '▶ &nbsp;PLAY';
+      btnPlay.classList.remove('playing');
+      if (animId) cancelAnimationFrame(animId);
+    }
+  });
+
+  /* ────────────────────────────────────────────────────
+     INITIAL STATIC RENDER
+  ──────────────────────────────────────────────────── */
+  render();
+</script>
+</body>
+</html>

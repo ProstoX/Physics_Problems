@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Collision Tracker</title>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  PARAMETRIC COLLISION TRACKER                                    ║
+  ║  Alice : A(t) = (2 + t,   8 − 3t)                               ║
+  ║  Bob   : B(t) = (2t − 1,  2t + 2)                               ║
+  ║                                                                  ║
+  ║  Path intersection  → (2.75, 5.75)   [lines cross in space]     ║
+  ║  Closest approach   → t = 33/26 ≈ 1.2692 s, d ≈ 1.765 units    ║
+  ║  Collision?         → NO — agents are never co-located           ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+
+<!-- Fonts: Orbitron (sci-fi display) + IBM Plex Mono (data readout) -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   RESET & CSS CUSTOM PROPERTIES
+═══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Colour palette — dark terminal / holographic HUD */
+  --void:        #060a10;        /* deepest background               */
+  --surface:     #0b1220;        /* card / panel background          */
+  --surface2:    #0f1a2e;        /* slightly lighter surface         */
+  --border:      #1a2f4a;        /* subtle border                    */
+  --border-hi:   #1f3d5c;        /* highlighted border               */
+  --dim:         #3a5570;        /* muted text                       */
+  --mid:         #6a90a8;        /* secondary text                   */
+  --text:        #c0d8e8;        /* primary readable text            */
+  --bright:      #e8f4ff;        /* near-white emphasis              */
+
+  --alice:       #38bdf8;        /* sky-blue for Alice               */
+  --alice-glow:  rgba(56,189,248,0.35);
+  --alice-soft:  rgba(56,189,248,0.10);
+
+  --bob:         #f87171;        /* coral-red for Bob                */
+  --bob-glow:    rgba(248,113,113,0.35);
+  --bob-soft:    rgba(248,113,113,0.10);
+
+  --intersect:   #a78bfa;        /* purple: path crossing marker     */
+  --intersect-glow: rgba(167,139,250,0.4);
+
+  --closest:     #fbbf24;        /* amber: closest-approach event    */
+  --closest-glow:rgba(251,191,36,0.4);
+  --closest-soft:rgba(251,191,36,0.08);
+
+  --danger:      #f87171;
+  --safe:        #34d399;
+
+  /* Scanline / noise texture via SVG data-URI */
+  --scanline: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BODY & PAGE LAYOUT
+═══════════════════════════════════════════════════════════ */
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px 52px;
+  gap: 18px;
+
+  /* radial vignette giving depth */
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.04) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(167,139,250,0.03) 0%, transparent 50%);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════ */
+header {
+  text-align: center;
+  max-width: 820px;
+}
+.eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(1.1rem, 3vw, 1.9rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bright);
+  line-height: 1.15;
+  /* subtle text glow */
+  text-shadow: 0 0 30px rgba(56,189,248,0.25);
+}
+header h1 .tag-no     { color: var(--safe); }
+header h1 .tag-yes    { color: var(--danger); }
+.subtitle {
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  line-height: 1.7;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN TWO-COLUMN LAYOUT
+═══════════════════════════════════════════════════════════ */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 14px;
+  width: 100%;
+  max-width: 1020px;
+  align-items: start;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CANVAS CARD
+═══════════════════════════════════════════════════════════ */
+.canvas-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px;
+  position: relative;
+  /* scanline overlay for CRT feel */
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 4px 40px rgba(0,0,0,0.6),
+    inset 0 0 80px rgba(0,0,0,0.3);
+}
+/* Corner bracket decoration */
+.canvas-card::before,
+.canvas-card::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border-color: var(--alice);
+  border-style: solid;
+  pointer-events: none;
+}
+.canvas-card::before { top: -1px; left: -1px;  border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+.canvas-card::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 3px;
+  /* faint scanlines */
+  background-image: var(--scanline);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDE PANEL
+═══════════════════════════════════════════════════════════ */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Generic panel card ─────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 13px 15px;
+}
+.panel-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--alice);
+  margin-bottom: 11px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+/* blinking dot in panel title */
+.panel-title .blink {
+  width: 5px; height: 5px;
+  background: var(--alice);
+  border-radius: 50%;
+  animation: blink 1.4s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── Telemetry rows ───────────────────────────────────────── */
+.telem { display: flex; flex-direction: column; gap: 5px; }
+.telem-row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+.telem-row.rule {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.t-key {
+  font-size: 0.62rem;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+}
+.t-val {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+  letter-spacing: 0.03em;
+  transition: color 0.15s;
+}
+.t-val.alice   { color: var(--alice); }
+.t-val.bob     { color: var(--bob); }
+.t-val.flash   { color: var(--closest); font-weight: 600; }
+
+/* ── Alert: closest approach ─────────────────────────────── */
+.alert {
+  background: var(--closest-soft);
+  border: 1px solid rgba(251,191,36,0.4);
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 0.7rem;
+  line-height: 1.65;
+  color: var(--text);
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.5s ease, max-height 0.5s ease, padding 0.5s ease;
+}
+.alert.show {
+  opacity: 1;
+  max-height: 120px;
+  padding: 10px 12px;
+}
+.alert-head {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--closest);
+  margin-bottom: 5px;
+}
+
+/* ── Legend ───────────────────────────────────────────────── */
+.legend { display: flex; flex-direction: column; gap: 7px; }
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.7rem;
+  color: var(--mid);
+}
+/* swatch shapes */
+.sw-line  { width: 20px; height: 2.5px; border-radius: 2px; flex-shrink: 0; }
+.sw-dash  { width: 20px; height: 0; flex-shrink: 0; border-top: 2px dashed; }
+.sw-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.sw-diam  {
+  width: 9px; height: 9px;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  border-radius: 1px;
+}
+
+/* ── Distance bar ─────────────────────────────────────────── */
+.dist-bar-wrap {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dist-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  color: var(--dim);
+}
+.dist-bar-track {
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dist-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--alice);
+  width: 100%;
+  transition: width 0.05s linear, background 0.2s;
+}
+
+/* ── Button ───────────────────────────────────────────────── */
+#playBtn {
+  width: 100%;
+  padding: 13px 0;
+  background: transparent;
+  border: 1px solid var(--alice);
+  border-radius: 5px;
+  color: var(--alice);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+#playBtn:hover {
+  background: var(--alice-soft);
+  box-shadow: 0 0 18px var(--alice-glow);
+}
+#playBtn:active { background: rgba(56,189,248,0.18); }
+#playBtn.playing {
+  border-color: var(--closest);
+  color: var(--closest);
+}
+#playBtn.playing:hover {
+  background: var(--closest-soft);
+  box-shadow: 0 0 18px var(--closest-glow);
+  cursor: default;
+}
+
+/* ── Status bar ───────────────────────────────────────────── */
+.status-bar {
+  width: 100%;
+  max-width: 1020px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 0.62rem;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+}
+.status-bar .sep  { color: var(--border); user-select: none; }
+.status-bar code  {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--mid);
+  background: rgba(255,255,255,0.03);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.status-bar .hi   { color: var(--text); }
+.status-bar .alice { color: var(--alice); }
+.status-bar .bob   { color: var(--bob); }
+</style>
+</head>
+
+<body>
+
+<!-- ═══════════════ HEADER ════════════════════════════════════ -->
+<header>
+  <div class="eyebrow">Vector Analysis · Parametric Motion · t ∈ [0, 3]</div>
+  <h1>Collision Detected?&nbsp;&nbsp;<span class="tag-no">[ NO ]</span></h1>
+  <div class="subtitle">
+    Paths intersect at (2.75, 5.75) — but Alice &amp; Bob pass through at different times.<br>
+    Closest approach occurs at t ≈ 1.27 s with a separation of ≈ 1.765 units.
+  </div>
+</header>
+
+<!-- ═══════════════ MAIN LAYOUT ══════════════════════════════ -->
+<div class="layout">
+
+  <!-- Canvas -->
+  <div class="canvas-card">
+    <canvas id="c"></canvas>
+  </div>
+
+  <!-- Right panel -->
+  <div class="side">
+
+    <!-- Live Telemetry -->
+    <div class="panel">
+      <div class="panel-title">
+        <span class="blink"></span> Telemetry
+      </div>
+      <div class="telem">
+        <div class="telem-row">
+          <span class="t-key">Time t</span>
+          <span class="t-val" id="vT">0.000 s</span>
+        </div>
+        <div class="telem-row">
+          <span class="t-key">Alice</span>
+          <span class="t-val alice" id="vA">(2.000,  8.000)</span>
+        </div>
+        <div class="telem-row">
+          <span class="t-key">Bob</span>
+          <span class="t-val bob"   id="vB">(−1.000,  2.000)</span>
+        </div>
+        <div class="telem-row rule">
+          <span class="t-key">Distance</span>
+          <span class="t-val" id="vD">—</span>
+        </div>
+      </div>
+
+      <!-- Proximity bar -->
+      <div class="dist-bar-wrap">
+        <div class="dist-bar-label">
+          <span>proximity</span>
+          <span id="barLabel">—</span>
+        </div>
+        <div class="dist-bar-track">
+          <div class="dist-bar-fill" id="distBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Closest-approach alert (hidden until triggered) -->
+    <div class="alert" id="alertBox">
+      <div class="alert-head">⚠ Closest Approach</div>
+      t = 1.269 s · d ≈ 1.765 units<br>
+      Path crossing ≠ collision.<br>
+      They never share the same point at the same time.
+    </div>
+
+    <!-- Legend -->
+    <div class="panel">
+      <div class="panel-title" style="color:var(--mid)">Legend</div>
+      <div class="legend">
+        <div class="leg-item">
+          <div class="sw-line"  style="background:var(--alice);box-shadow:0 0 6px var(--alice-glow)"></div>
+          Alice's path
+        </div>
+        <div class="leg-item">
+          <div class="sw-dot"   style="background:var(--alice);box-shadow:0 0 8px var(--alice-glow)"></div>
+          Alice at t
+        </div>
+        <div class="leg-item" style="margin-top:3px">
+          <div class="sw-line"  style="background:var(--bob);box-shadow:0 0 6px var(--bob-glow)"></div>
+          Bob's path
+        </div>
+        <div class="leg-item">
+          <div class="sw-dot"   style="background:var(--bob);box-shadow:0 0 8px var(--bob-glow)"></div>
+          Bob at t
+        </div>
+        <div class="leg-item" style="margin-top:3px">
+          <div class="sw-dash"  style="border-color:rgba(192,216,232,0.4)"></div>
+          Distance A ↔ B
+        </div>
+        <div class="leg-item">
+          <div class="sw-diam"  style="background:var(--intersect);box-shadow:0 0 6px var(--intersect-glow)"></div>
+          Path intersection
+        </div>
+        <div class="leg-item">
+          <div class="sw-dot"   style="background:var(--closest);box-shadow:0 0 8px var(--closest-glow)"></div>
+          Closest approach
+        </div>
+      </div>
+    </div>
+
+    <!-- Button -->
+    <button id="playBtn">▶&nbsp;&nbsp;Initialise</button>
+
+  </div><!-- /side -->
+</div><!-- /layout -->
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span class="alice">A(t)</span><code>= (2+t, 8−3t)</code>
+  <span class="sep">|</span>
+  <span class="bob">B(t)</span><code>= (2t−1, 2t+2)</code>
+  <span class="sep">|</span>
+  <span class="hi">Path ∩</span> at <code>(2.75, 5.75)</code>
+  <span class="sep">|</span>
+  Closest <code>t = 33/26</code>
+  <span class="sep">|</span>
+  Min dist <code>9/√26 ≈ 1.765</code>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ──────────────────────────────────────────────────────────
+     §1  PHYSICS — parametric equations & key quantities
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Alice's position at time t
+   * A(t) = (2 + t,  8 − 3t)
+   */
+  function alice(t) { return { x: 2 + t,   y: 8 - 3*t }; }
+
+  /**
+   * Bob's position at time t
+   * B(t) = (2t − 1,  2t + 2)
+   */
+  function bob(t)   { return { x: 2*t - 1, y: 2*t + 2 }; }
+
+  /** Euclidean distance between two points */
+  function dist(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  /**
+   * PATH INTERSECTION — where the two LINE paths cross in space
+   * (regardless of when each agent passes through).
+   *   Alice line: y = −3x + 14
+   *   Bob line:   y =  x  +  3
+   *   Solve: −3x + 14 = x + 3  →  4x = 11  →  x = 2.75, y = 5.75
+   */
+  const INTERSECT = { x: 2.75, y: 5.75 };
+
+  /**
+   * CLOSEST APPROACH — minimise D²(t) = (Ax−Bx)² + (Ay−By)²
+   *   Ax−Bx = (2+t) − (2t−1) = 3 − t
+   *   Ay−By = (8−3t) − (2t+2) = 6 − 5t
+   *   D²(t) = (3−t)² + (6−5t)²
+   *   dD²/dt = 2(3−t)(−1) + 2(6−5t)(−5) = 0
+   *   → −(3−t) − 5(6−5t) = 0
+   *   → −3 + t − 30 + 25t = 0
+   *   → 26t = 33  →  t = 33/26
+   */
+  const T_CLOSEST  = 33 / 26;                            // ≈ 1.2692
+  const D_CLOSEST  = dist(alice(T_CLOSEST), bob(T_CLOSEST)); // ≈ 1.765
+  const D_MAX_INIT = dist(alice(0), bob(0));              // initial distance (for bar scale)
+
+  const T_MIN  = 0;
+  const T_MAX  = 3.0;
+  const PAUSE  = 0.85;   // real-seconds pause at closest approach
+
+  /* ──────────────────────────────────────────────────────────
+     §2  CANVAS SETUP & COORDINATE TRANSFORM
+  ────────────────────────────────────────────────────────── */
+
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+
+  // Logical canvas resolution
+  const CW = 720, CH = 700;
+  canvas.width = CW; canvas.height = CH;
+
+  // World coordinate ranges: x ∈ [−2, 8], y ∈ [−2, 10]
+  const WX0 = -2, WX1 = 8;
+  const WY0 = -2, WY1 = 10;
+
+  // Plot margins (pixels)
+  const PL = 56, PR = 22, PT = 24, PB = 52;
+  const PW = CW - PL - PR;
+  const PH = CH - PT - PB;
+
+  /** World x → canvas pixel x */
+  function wx(x) { return PL + (x - WX0) / (WX1 - WX0) * PW; }
+  /** World y → canvas pixel y  (y-axis inverted) */
+  function wy(y) { return CH - PB - (y - WY0) / (WY1 - WY0) * PH; }
+
+  /* ──────────────────────────────────────────────────────────
+     §3  PRIMITIVE DRAW HELPERS
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Draw a rounded rectangle path (not stroked/filled — caller does that).
+   * Used for tooltip bubbles.
+   */
+  function rRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);           ctx.lineTo(x+w-r, y);
+    ctx.arcTo(x+w, y,   x+w, y+r,   r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h);
+    ctx.arcTo(x,   y+h, x,   y+h-r, r);
+    ctx.lineTo(x,   y+r);
+    ctx.arcTo(x,   y,   x+r, y,     r);
+    ctx.closePath();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §4  SCENE LAYERS
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Layer 0: Background, grid, axes, tick labels.
+   * Called once per frame — everything is redrawn (no dirty rects needed
+   * at this canvas size).
+   */
+  function drawBackground() {
+    // Dark bg matching CSS --surface
+    ctx.fillStyle = '#0b1220';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Subtle radial gradient giving depth to the plot area
+    const grad = ctx.createRadialGradient(wx(3), wy(4), 60, wx(3), wy(4), 380);
+    grad.addColorStop(0, 'rgba(56,189,248,0.04)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CW, CH);
+
+    // ── Minor grid lines (integer world coords) ──────────────
+    ctx.strokeStyle = 'rgba(26,47,74,0.6)';
+    ctx.lineWidth   = 0.7;
+    for (let x = WX0; x <= WX1; x++) {
+      ctx.beginPath(); ctx.moveTo(wx(x), PT); ctx.lineTo(wx(x), CH-PB); ctx.stroke();
+    }
+    for (let y = WY0; y <= WY1; y++) {
+      ctx.beginPath(); ctx.moveTo(PL, wy(y)); ctx.lineTo(CW-PR, wy(y)); ctx.stroke();
+    }
+
+    // ── Principal axes (x=0, y=0) ────────────────────────────
+    ctx.strokeStyle = 'rgba(100,150,180,0.35)';
+    ctx.lineWidth   = 1.2;
+    ctx.beginPath(); ctx.moveTo(PL, wy(0)); ctx.lineTo(CW-PR, wy(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(wx(0), PT); ctx.lineTo(wx(0), CH-PB); ctx.stroke();
+
+    // ── Tick marks + numeric labels ──────────────────────────
+    ctx.font      = '10px "IBM Plex Mono", monospace';
+    ctx.fillStyle = 'rgba(106,144,168,0.7)';
+
+    ctx.textAlign = 'center';
+    for (let x = WX0; x <= WX1; x++) {
+      ctx.strokeStyle = 'rgba(100,150,180,0.25)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(wx(x), wy(0)); ctx.lineTo(wx(x), wy(0)+5); ctx.stroke();
+      if (x !== 0) ctx.fillText(x, wx(x), wy(0)+16);
+    }
+    ctx.textAlign = 'right';
+    for (let y = WY0; y <= WY1; y++) {
+      ctx.strokeStyle = 'rgba(100,150,180,0.25)'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(wx(0), wy(y)); ctx.lineTo(wx(0)-5, wy(y)); ctx.stroke();
+      if (y !== 0) ctx.fillText(y, wx(0)-8, wy(y)+4);
+    }
+    // origin label
+    ctx.textAlign = 'right';
+    ctx.fillText('0', wx(0)-8, wy(0)+15);
+
+    // ── Axis name labels ──────────────────────────────────────
+    ctx.fillStyle = 'rgba(106,144,168,0.5)';
+    ctx.font      = '11px "Orbitron", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('x', CW-PR+14, wy(0)+4);
+    ctx.save();
+    ctx.translate(14, PT+PH/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.fillText('y', 0, 0);
+    ctx.restore();
+  }
+
+  /**
+   * Layer 1: Ghost full-range paths for both agents.
+   * Drawn as dim lines so the user sees the complete trajectory.
+   */
+  function drawGhostPaths() {
+    function drawPath(fn, color, t0, t1, steps) {
+      ctx.strokeStyle  = color;
+      ctx.lineWidth    = 1.5;
+      ctx.globalAlpha  = 0.18;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t  = t0 + (t1 - t0) * (i / steps);
+        const pt = fn(t);
+        i === 0
+          ? ctx.moveTo(wx(pt.x), wy(pt.y))
+          : ctx.lineTo(wx(pt.x), wy(pt.y));
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    drawPath(alice, '#38bdf8', -0.5, 3.6, 80);
+    drawPath(bob,   '#f87171', -0.5, 3.6, 80);
+  }
+
+  /**
+   * Layer 2: Purple diamond marking where the two PATHS cross in space.
+   * This is NOT where the agents meet — they pass through at different times.
+   */
+  function drawPathIntersection() {
+    const px = wx(INTERSECT.x), py = wy(INTERSECT.y);
+    const s  = 7;
+
+    // Halo
+    const g = ctx.createRadialGradient(px, py, 0, px, py, 20);
+    g.addColorStop(0, 'rgba(167,139,250,0.25)');
+    g.addColorStop(1, 'rgba(167,139,250,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(px, py, 20, 0, Math.PI*2); ctx.fill();
+
+    // Diamond
+    ctx.fillStyle   = '#a78bfa';
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth   = 1.2;
+    ctx.shadowColor = 'rgba(167,139,250,0.8)';
+    ctx.shadowBlur  = 10;
+    ctx.beginPath();
+    ctx.moveTo(px,   py-s); ctx.lineTo(px+s, py);
+    ctx.lineTo(px,   py+s); ctx.lineTo(px-s, py);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Label
+    ctx.fillStyle = '#a78bfa';
+    ctx.font      = '500 9px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Path ∩ (2.75, 5.75)', px+12, py-2);
+    ctx.fillStyle = 'rgba(167,139,250,0.5)';
+    ctx.fillText('≠ collision', px+12, py+10);
+  }
+
+  /**
+   * Layer 3: Closest-approach marker — amber pulsing ring + tooltip
+   * centred on the midpoint between Alice & Bob at T_CLOSEST.
+   * Fades in on alpha parameter.
+   */
+  function drawClosestApproachMarker(alpha) {
+    if (alpha <= 0) return;
+    const a  = alice(T_CLOSEST), b = bob(T_CLOSEST);
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const px = wx(mx), py = wy(my);
+
+    ctx.globalAlpha = alpha;
+
+    // Pulsing dashed ring
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth   = 1.2;
+    ctx.setLineDash([4, 4]);
+    ctx.shadowColor = 'rgba(251,191,36,0.5)';
+    ctx.shadowBlur  = 8;
+    ctx.beginPath(); ctx.arc(px, py, 26, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.shadowBlur  = 0;
+
+    // Dots for Alice & Bob positions at T_CLOSEST
+    [[a, '#38bdf8'], [b, '#f87171']].forEach(([pt, col]) => {
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.5;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(wx(pt.x), wy(pt.y));
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Tooltip box
+    const bw = 148, bh = 34;
+    const bx = px - bw/2, by = py - bh - 30;
+    ctx.fillStyle   = 'rgba(10,16,30,0.97)';
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth   = 1;
+    rRect(bx, by, bw, bh, 4); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.font      = '600 9px "Orbitron", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`⚠  t = ${T_CLOSEST.toFixed(3)} s`, px, by + 12);
+    ctx.font      = '400 9px "IBM Plex Mono", monospace';
+    ctx.fillStyle = 'rgba(251,191,36,0.75)';
+    ctx.fillText(`min dist = ${D_CLOSEST.toFixed(4)}`, px, by + 25);
+
+    // Stem from tooltip to ring
+    ctx.strokeStyle = 'rgba(251,191,36,0.3)';
+    ctx.lineWidth   = 1;
+    ctx.beginPath(); ctx.moveTo(px, by+bh); ctx.lineTo(px, py-26); ctx.stroke();
+
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Layer 4: Dashed line connecting Alice and Bob, labeled with live distance.
+   * flashAlpha (0–1) tints it amber at closest approach.
+   */
+  function drawDistanceLine(a, b, flashAlpha) {
+    const ax = wx(a.x), ay = wy(a.y);
+    const bx = wx(b.x), by = wy(b.y);
+    const d  = dist(a, b);
+    const mx = (ax+bx)/2, my = (ay+by)/2;
+
+    // Base dashed line
+    ctx.strokeStyle = 'rgba(192,216,232,0.32)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+
+    // Amber flash overlay
+    if (flashAlpha > 0) {
+      ctx.strokeStyle = `rgba(251,191,36,${flashAlpha * 0.9})`;
+      ctx.lineWidth   = 2.5;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Distance label at midpoint
+    const pad = 10;
+    ctx.fillStyle = flashAlpha > 0.3
+      ? `rgba(251,191,36,${0.5 + flashAlpha * 0.5})`
+      : 'rgba(192,216,232,0.5)';
+    ctx.font      = '9px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`d = ${d.toFixed(3)}`, mx, my - pad);
+  }
+
+  /**
+   * Layer 5: Animated agent with glow + labeled dot.
+   * trail: array of {x,y} world points for the historical path ribbon.
+   */
+  function drawAgent(pos, color, glowColor, label, trail) {
+    const px = wx(pos.x), py = wy(pos.y);
+
+    // ── Historical trail ribbon ───────────────────────────────
+    if (trail.length > 1) {
+      ctx.lineWidth   = 1.8;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      trail.forEach((p, i) => {
+        // Fade alpha along trail (older = more transparent)
+        const a = i / trail.length;
+        if (i === 0) {
+          ctx.strokeStyle = color;
+          ctx.moveTo(wx(p.x), wy(p.y));
+        } else {
+          ctx.strokeStyle = color;
+          ctx.lineTo(wx(p.x), wy(p.y));
+        }
+      });
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // ── Outer glow halo ───────────────────────────────────────
+    const glow = ctx.createRadialGradient(px, py, 0, px, py, 18);
+    glow.addColorStop(0, glowColor);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(px, py, 18, 0, Math.PI*2); ctx.fill();
+
+    // ── Core dot ──────────────────────────────────────────────
+    ctx.fillStyle   = color;
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth   = 1.5;
+    ctx.shadowColor = glowColor.replace('0.35', '0.8');
+    ctx.shadowBlur  = 12;
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // ── Name label ────────────────────────────────────────────
+    ctx.fillStyle = color;
+    ctx.font      = '600 10px "Orbitron", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, px + 11, py - 4);
+    // coordinate sub-label
+    ctx.font      = '300 9px "IBM Plex Mono", monospace';
+    ctx.fillStyle = color.replace(')', ',0.55)').replace('rgb','rgba'); // hacky tint
+    ctx.fillStyle = `${color}88`;
+    ctx.fillText(`(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})`, px + 11, py + 8);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §5  FULL COMPOSITE RENDER (called every animation frame)
+  ────────────────────────────────────────────────────────── */
+
+  // Mutable trail arrays — updated each tick
+  let trailA = [];
+  let trailB = [];
+
+  function render(t, caAlpha, flashAlpha) {
+    const a = alice(t), b = bob(t);
+
+    drawBackground();
+    drawGhostPaths();
+    drawPathIntersection();
+    drawDistanceLine(a, b, flashAlpha);
+    drawClosestApproachMarker(caAlpha);
+    drawAgent(a, '#38bdf8', 'rgba(56,189,248,0.35)', 'Alice', trailA);
+    drawAgent(b, '#f87171', 'rgba(248,113,113,0.35)', 'Bob',   trailB);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §6  DOM HUD UPDATES
+  ────────────────────────────────────────────────────────── */
+
+  const elT      = document.getElementById('vT');
+  const elA      = document.getElementById('vA');
+  const elB      = document.getElementById('vB');
+  const elD      = document.getElementById('vD');
+  const alertBox = document.getElementById('alertBox');
+  const distBar  = document.getElementById('distBar');
+  const barLabel = document.getElementById('barLabel');
+
+  // Max distance for scaling the proximity bar (initial separation)
+  const D_BAR_MAX = dist(alice(0), bob(0)); // ≈ 7.81 — use for full bar
+
+  function fmt(n, dp = 3) { return n.toFixed(dp); }
+  function fmtXY(p) { return `(${fmt(p.x)},  ${fmt(p.y)})`; }
+
+  function updateHUD(t, a, b) {
+    const d        = dist(a, b);
+    const atCA     = Math.abs(t - T_CLOSEST) < 0.1;
+
+    elT.textContent = `${fmt(t)} s`;
+    elA.textContent = fmtXY(a);
+    elB.textContent = fmtXY(b);
+    elD.textContent = `${fmt(d, 4)} units`;
+    elD.className   = `t-val${atCA ? ' flash' : ''}`;
+
+    // Proximity bar: full = max dist, empty = 0. Colour flips amber when close.
+    const pct = Math.min(1, d / D_BAR_MAX) * 100;
+    distBar.style.width      = `${pct}%`;
+    distBar.style.background = atCA ? '#fbbf24' : '#38bdf8';
+    barLabel.textContent     = `${fmt(d, 2)} u`;
+    barLabel.style.color     = atCA ? '#fbbf24' : '';
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §7  ANIMATION LOOP
+  ────────────────────────────────────────────────────────── */
+
+  let animId      = null;
+  let simTime     = 0;
+  let pauseTimer  = 0;
+  let pauseDone   = false;   // only pause once per playback
+  let caAlpha     = 0;       // closest-approach overlay opacity (0→1, stays 1)
+  let flashAlpha  = 0;       // amber flash for the distance line
+  let lastTS      = null;
+
+  const SIM_SPEED  = 0.55;   // sim-seconds per real-second (slow for clarity)
+  const TRAIL_MAX  = 100;    // max trail points kept
+
+  function tick(ts) {
+    // Bootstrap: record first timestamp and schedule next frame
+    if (lastTS === null) { lastTS = ts; animId = requestAnimationFrame(tick); return; }
+
+    const dtReal = Math.min((ts - lastTS) / 1000, 0.05); // cap at 50 ms for tab-switching
+    lastTS = ts;
+
+    // ── Trigger closest-approach pause ───────────────────────
+    if (!pauseDone && simTime >= T_CLOSEST - 0.01) {
+      pauseDone   = true;
+      pauseTimer  = PAUSE;
+      caAlpha     = 1;
+      flashAlpha  = 1;
+      alertBox.classList.add('show');
+    }
+
+    // ── Tick the simulation (paused during closest-approach hold) ──
+    if (pauseTimer > 0) {
+      pauseTimer -= dtReal;
+      flashAlpha  = Math.max(0, pauseTimer / PAUSE); // decays to 0
+    } else {
+      simTime   += dtReal * SIM_SPEED;
+      flashAlpha  = 0;
+    }
+
+    // ── End of simulation ────────────────────────────────────
+    if (simTime >= T_MAX) {
+      simTime = T_MAX;
+      render(simTime, caAlpha, 0);
+      updateHUD(simTime, alice(simTime), bob(simTime));
+      playBtn.textContent = '↺  Reset';
+      playBtn.classList.remove('playing');
+      lastTS = null;
+      return; // stop loop
+    }
+
+    // ── Update trails ─────────────────────────────────────────
+    const a = alice(simTime), b = bob(simTime);
+    trailA.push({ x: a.x, y: a.y });
+    trailB.push({ x: b.x, y: b.y });
+    if (trailA.length > TRAIL_MAX) trailA.shift();
+    if (trailB.length > TRAIL_MAX) trailB.shift();
+
+    // ── Render & update HUD ───────────────────────────────────
+    render(simTime, caAlpha, flashAlpha);
+    updateHUD(simTime, a, b);
+
+    animId = requestAnimationFrame(tick);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §8  PLAY / RESET BUTTON
+  ────────────────────────────────────────────────────────── */
+
+  const playBtn = document.getElementById('playBtn');
+
+  function fullReset() {
+    cancelAnimationFrame(animId);
+    animId = null; simTime = 0; lastTS = null;
+    trailA = []; trailB = [];
+    pauseTimer = 0; pauseDone = false;
+    caAlpha = 0; flashAlpha = 0;
+    alertBox.classList.remove('show');
+    elT.textContent = '0.000 s';
+    elA.textContent = fmtXY(alice(0));
+    elB.textContent = fmtXY(bob(0));
+    elD.textContent = '—';
+    elD.className   = 't-val';
+    distBar.style.width = '100%';
+    distBar.style.background = '';
+    barLabel.textContent = '—';
+    barLabel.style.color = '';
+    render(0, 0, 0); // draw static first frame
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (playBtn.classList.contains('playing')) return; // ignore clicks while running
+    fullReset();
+    playBtn.textContent = '■  Running…';
+    playBtn.classList.add('playing');
+    animId = requestAnimationFrame(tick);
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     §9  INITIAL FRAME
+  ────────────────────────────────────────────────────────── */
+  fullReset();
+
+})(); // end IIFE
+</script>
+</body>
+</html>

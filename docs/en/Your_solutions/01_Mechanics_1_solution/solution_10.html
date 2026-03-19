@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elliptical Helix — 3D Kinematic Trajectory</title>
+
+  <!-- ── Plotly.js via CDN ── -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+
+  <!-- ── Fonts ── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══════════════════════════════════════════════════
+       VARIABLES
+    ══════════════════════════════════════════════════ */
+    :root {
+      --bg:          #08090e;
+      --panel:       rgba(11, 13, 22, 0.88);
+      --border:      rgba(255,255,255,0.08);
+      --border-hi:   rgba(255,255,255,0.16);
+      --text:        #d8dff0;
+      --dim:         #3e4460;
+      --mid:         #7880a8;
+      --accent:      #7c6cff;      /* violet */
+      --accent2:     #00e5c8;      /* cyan-teal */
+      --particle:    #ff9f43;      /* warm orange particle */
+      --helix-col:   #7c6cff;
+      --cyl-col:     rgba(0,229,200,0.12);
+      --font-ui:     'Outfit', sans-serif;
+      --font-mono:   'JetBrains Mono', monospace;
+      --radius:      10px;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: var(--font-ui);
+      color: var(--text);
+    }
+
+    /* ══════════════════════════════════════════════════
+       FULL-BLEED PLOT CONTAINER
+    ══════════════════════════════════════════════════ */
+    #plot {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ══════════════════════════════════════════════════
+       FLOATING HEADER (top centre)
+    ══════════════════════════════════════════════════ */
+    .header-badge {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel);
+      border: 1px solid var(--border-hi);
+      border-radius: 100px;
+      padding: 8px 22px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      white-space: nowrap;
+    }
+
+    .header-badge h1 {
+      font-family: var(--font-ui);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+
+    .header-badge .eq {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--accent);
+      background: rgba(124,108,255,0.12);
+      border: 1px solid rgba(124,108,255,0.2);
+      border-radius: 6px;
+      padding: 3px 10px;
+    }
+
+    /* ══════════════════════════════════════════════════
+       CONTROL PANEL (left side)
+    ══════════════════════════════════════════════════ */
+    .panel {
+      position: fixed;
+      top: 50%;
+      left: 20px;
+      transform: translateY(-50%);
+      width: 220px;
+      background: var(--panel);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--radius);
+      padding: 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* panel section heading */
+    .panel-title {
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    /* ── Slider group ── */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .slider-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .slider-name {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .slider-name em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .slider-val {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--accent2);
+      min-width: 28px;
+      text-align: right;
+    }
+
+    /* custom range slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--dim);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg);
+      box-shadow: 0 0 8px rgba(124,108,255,0.55);
+      transition: transform 0.1s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg);
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Play button ── */
+    #btnPlay {
+      background: linear-gradient(135deg, rgba(124,108,255,0.25), rgba(0,229,200,0.15));
+      border: 1px solid rgba(124,108,255,0.4);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 10px 0;
+      width: 100%;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #btnPlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(124,108,255,0.15), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #btnPlay:hover { border-color: var(--accent); box-shadow: 0 0 18px rgba(124,108,255,0.25); }
+    #btnPlay:hover::before { opacity: 1; }
+    #btnPlay.animating { border-color: var(--particle); color: var(--particle); box-shadow: 0 0 18px rgba(255,159,67,0.25); }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.63rem;
+      color: var(--mid);
+    }
+
+    .legend-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .legend-line {
+      width: 20px; height: 2px;
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    /* ══════════════════════════════════════════════════
+       LIVE READOUT (bottom right)
+    ══════════════════════════════════════════════════ */
+    .readout {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      backdrop-filter: blur(16px);
+      z-index: 10;
+      min-width: 190px;
+    }
+
+    .readout-title {
+      font-size: 0.57rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 10px;
+    }
+
+    .readout-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px;
+      align-items: baseline;
+    }
+
+    .rk { font-family: var(--font-mono); font-size: 0.6rem; color: var(--mid); }
+    .rv {
+      font-family: var(--font-mono); font-size: 0.7rem;
+      font-weight: 500; color: var(--particle);
+      text-align: right;
+    }
+    .rv.hidden { color: var(--dim); }
+  </style>
+</head>
+<body>
+
+<!-- ── Floating header ── -->
+<div class="header-badge">
+  <h1>Elliptical Helix</h1>
+  <span class="eq">r(t) = (a·cos ωt, b·sin ωt, bt)</span>
+</div>
+
+<!-- ── Full-bleed Plotly container ── -->
+<div id="plot"></div>
+
+<!-- ══════════════════════════════════════════════════
+     CONTROL PANEL
+══════════════════════════════════════════════════ -->
+<div class="panel">
+
+  <span class="panel-title">Parameters</span>
+
+  <div class="slider-group">
+
+    <!-- a slider -->
+    <div class="slider-item">
+      <div class="slider-header">
+        <span class="slider-name"><em>a</em> &nbsp;<span style="color:var(--mid);font-size:0.6rem">x-amplitude</span></span>
+        <span class="slider-val" id="val-a">5</span>
+      </div>
+      <input type="range" id="sl-a" min="1" max="10" step="0.1" value="5" />
+    </div>
+
+    <!-- b slider -->
+    <div class="slider-item">
+      <div class="slider-header">
+        <span class="slider-name"><em>b</em> &nbsp;<span style="color:var(--mid);font-size:0.6rem">y-amp / z-pitch</span></span>
+        <span class="slider-val" id="val-b">3</span>
+      </div>
+      <input type="range" id="sl-b" min="1" max="10" step="0.1" value="3" />
+    </div>
+
+    <!-- omega slider -->
+    <div class="slider-item">
+      <div class="slider-header">
+        <span class="slider-name"><em>ω</em> &nbsp;<span style="color:var(--mid);font-size:0.6rem">angular freq.</span></span>
+        <span class="slider-val" id="val-w">1.0</span>
+      </div>
+      <input type="range" id="sl-w" min="0.1" max="5" step="0.1" value="1" />
+    </div>
+
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Play animation button -->
+  <button id="btnPlay">▶ &nbsp;Play Animation</button>
+
+  <div class="divider"></div>
+
+  <!-- Legend -->
+  <div>
+    <span class="panel-title" style="display:block;margin-bottom:10px;">Legend</span>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-line" style="background:#7c6cff;"></div>
+        <span>Helix trajectory</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:rgba(0,229,200,0.5); border: 1px dashed rgba(0,229,200,0.4);"></div>
+        <span>Elliptic cylinder</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#ff9f43; box-shadow: 0 0 6px rgba(255,159,67,0.6);"></div>
+        <span>Particle position</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     LIVE READOUT
+══════════════════════════════════════════════════ -->
+<div class="readout">
+  <div class="readout-title">Particle State</div>
+  <div class="readout-grid">
+    <span class="rk">t</span>     <span class="rv" id="rd-t">—</span>
+    <span class="rk">x(t)</span>  <span class="rv" id="rd-x">—</span>
+    <span class="rk">y(t)</span>  <span class="rv" id="rd-y">—</span>
+    <span class="rk">z(t)</span>  <span class="rv" id="rd-z">—</span>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════ -->
+<script>
+  /* ─────────────────────────────────────────────────────────
+     PARAMETER STATE
+  ───────────────────────────────────────────────────────── */
+  let params = { a: 5, b: 3, w: 1 };
+
+  /* Time domain for the helix */
+  const T_MIN    = 0;
+  const T_MAX    = 20;
+  const T_STEPS  = 600;   /* resolution of trajectory */
+
+  /* ─────────────────────────────────────────────────────────
+     MATH HELPERS
+  ───────────────────────────────────────────────────────── */
+
+  /**
+   * Generate helix trajectory arrays.
+   * r(t) = (a·cos(ωt),  b·sin(ωt),  b·t)
+   */
+  function computeHelix(a, b, w) {
+    const xs = [], ys = [], zs = [];
+    for (let i = 0; i <= T_STEPS; i++) {
+      const t = T_MIN + (T_MAX - T_MIN) * (i / T_STEPS);
+      xs.push(a * Math.cos(w * t));
+      ys.push(b * Math.sin(w * t));
+      zs.push(b * t);
+    }
+    return { xs, ys, zs };
+  }
+
+  /**
+   * Generate elliptical cylinder surface mesh.
+   * x = a·cos(θ),  y = b·sin(θ),  z ∈ [0, b·T_MAX]
+   */
+  function computeCylinder(a, b) {
+    const THETA_STEPS = 60;
+    const Z_STEPS     = 2;    /* just top and bottom — a ruled surface */
+    const zTop        = b * T_MAX;
+
+    const xs = [], ys = [], zs = [];
+
+    /* Build a grid: rows = z levels, cols = theta angles */
+    const zLevels  = [0, zTop];
+    const thetas   = [];
+    for (let j = 0; j <= THETA_STEPS; j++) {
+      thetas.push((2 * Math.PI * j) / THETA_STEPS);
+    }
+
+    /* Plotly surface wants 2D arrays (rows of z, cols of theta) */
+    for (let zi = 0; zi < zLevels.length; zi++) {
+      const xRow = [], yRow = [], zRow = [];
+      for (let j = 0; j <= THETA_STEPS; j++) {
+        xRow.push(a * Math.cos(thetas[j]));
+        yRow.push(b * Math.sin(thetas[j]));
+        zRow.push(zLevels[zi]);
+      }
+      xs.push(xRow);
+      ys.push(yRow);
+      zs.push(zRow);
+    }
+    return { xs, ys, zs };
+  }
+
+  /**
+   * Compute particle position at parameter t.
+   */
+  function particleAt(t, a, b, w) {
+    return {
+      x: a * Math.cos(w * t),
+      y: b * Math.sin(w * t),
+      z: b * t
+    };
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     PLOTLY TRACE DEFINITIONS
+  ───────────────────────────────────────────────────────── */
+
+  /** Trace 0 — helix path (scatter3d line) */
+  function makeHelixTrace(a, b, w) {
+    const { xs, ys, zs } = computeHelix(a, b, w);
+    return {
+      type: 'scatter3d',
+      mode: 'lines',
+      x: xs, y: ys, z: zs,
+      line: {
+        color: zs,               /* colour along z for a gradient effect */
+        colorscale: [
+          [0,   '#4a3db5'],
+          [0.3, '#7c6cff'],
+          [0.7, '#a890ff'],
+          [1,   '#00e5c8']
+        ],
+        width: 4
+      },
+      hoverinfo: 'none',
+      name: 'Helix'
+    };
+  }
+
+  /** Trace 1 — elliptical cylinder (surface) */
+  function makeCylinderTrace(a, b) {
+    const { xs, ys, zs } = computeCylinder(a, b);
+    return {
+      type: 'surface',
+      x: xs, y: ys, z: zs,
+      colorscale: [[0, 'rgba(0,229,200,0.06)'], [1, 'rgba(0,229,200,0.18)']],
+      showscale: false,
+      opacity: 0.35,
+      contours: {
+        x: { highlight: false },
+        y: { highlight: false },
+        z: { highlight: false }
+      },
+      hoverinfo: 'none',
+      name: 'Cylinder'
+    };
+  }
+
+  /** Trace 2 — particle marker (scatter3d single point) */
+  function makeParticleTrace(x, y, z) {
+    return {
+      type: 'scatter3d',
+      mode: 'markers',
+      x: [x], y: [y], z: [z],
+      marker: {
+        size: 9,
+        color: '#ff9f43',
+        symbol: 'circle',
+        line: { color: '#fff', width: 1 },
+        opacity: 1
+      },
+      hovertemplate:
+        '<b>Particle</b><br>' +
+        'x: %{x:.3f}<br>' +
+        'y: %{y:.3f}<br>' +
+        'z: %{z:.3f}<extra></extra>',
+      name: 'Particle'
+    };
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     PLOTLY LAYOUT
+  ───────────────────────────────────────────────────────── */
+  const LAYOUT = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor:  'rgba(0,0,0,0)',
+    margin: { l: 0, r: 0, t: 0, b: 0 },
+    showlegend: false,
+    scene: {
+      bgcolor: 'rgba(8,9,14,0)',   /* transparent so CSS bg shows */
+      aspectmode: 'cube',
+      xaxis: {
+        title: { text: 'x', font: { color: '#7880a8', size: 11, family: 'JetBrains Mono' } },
+        tickfont: { color: '#3e4460', size: 9 },
+        gridcolor: '#1a1c2a',
+        zerolinecolor: '#2a2d40',
+        backgroundcolor: 'rgba(12,14,24,0.4)',
+        showbackground: true
+      },
+      yaxis: {
+        title: { text: 'y', font: { color: '#7880a8', size: 11, family: 'JetBrains Mono' } },
+        tickfont: { color: '#3e4460', size: 9 },
+        gridcolor: '#1a1c2a',
+        zerolinecolor: '#2a2d40',
+        backgroundcolor: 'rgba(12,14,24,0.4)',
+        showbackground: true
+      },
+      zaxis: {
+        title: { text: 'z', font: { color: '#7880a8', size: 11, family: 'JetBrains Mono' } },
+        tickfont: { color: '#3e4460', size: 9 },
+        gridcolor: '#1a1c2a',
+        zerolinecolor: '#2a2d40',
+        backgroundcolor: 'rgba(12,14,24,0.3)',
+        showbackground: true
+      },
+      camera: {
+        eye: { x: 1.6, y: 1.6, z: 0.8 }
+      }
+    },
+    uirevision: 'keep'   /* preserve camera on re-draw */
+  };
+
+  const CONFIG = {
+    displayModeBar: false,   /* hide Plotly toolbar */
+    responsive: true
+  };
+
+  /* ─────────────────────────────────────────────────────────
+     INITIAL RENDER
+  ───────────────────────────────────────────────────────── */
+  const { a, b, w } = params;
+  const p0 = particleAt(0, a, b, w);
+
+  Plotly.newPlot('plot', [
+    makeHelixTrace(a, b, w),    /* trace 0 */
+    makeCylinderTrace(a, b),    /* trace 1 */
+    makeParticleTrace(p0.x, p0.y, p0.z)  /* trace 2 */
+  ], LAYOUT, CONFIG);
+
+  /* ─────────────────────────────────────────────────────────
+     FULL RE-DRAW when params change (helix + cylinder update)
+  ───────────────────────────────────────────────────────── */
+  function redraw() {
+    const { a, b, w } = params;
+    const pt = particleAt(0, a, b, w);
+
+    /* Plotly.react is efficient — only redraws changed data */
+    Plotly.react('plot', [
+      makeHelixTrace(a, b, w),
+      makeCylinderTrace(a, b),
+      makeParticleTrace(pt.x, pt.y, pt.z)
+    ], LAYOUT, CONFIG);
+
+    resetReadout();
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     SLIDER LISTENERS
+  ───────────────────────────────────────────────────────── */
+  document.getElementById('sl-a').addEventListener('input', function () {
+    params.a = parseFloat(this.value);
+    document.getElementById('val-a').textContent = params.a.toFixed(1);
+    stopAnimation();
+    redraw();
+  });
+
+  document.getElementById('sl-b').addEventListener('input', function () {
+    params.b = parseFloat(this.value);
+    document.getElementById('val-b').textContent = params.b.toFixed(1);
+    stopAnimation();
+    redraw();
+  });
+
+  document.getElementById('sl-w').addEventListener('input', function () {
+    params.w = parseFloat(this.value);
+    document.getElementById('val-w').textContent = params.w.toFixed(1);
+    stopAnimation();
+    redraw();
+  });
+
+  /* ─────────────────────────────────────────────────────────
+     PARTICLE ANIMATION
+  ───────────────────────────────────────────────────────── */
+  let animId       = null;
+  let animPlaying  = false;
+  let animT        = 0;           /* current animation time */
+  const ANIM_SPEED = 0.06;        /* t units per frame */
+
+  /** Update the particle marker trace (trace index 2). */
+  function moveParticle(t) {
+    const { a, b, w } = params;
+    const { x, y, z } = particleAt(t, a, b, w);
+
+    Plotly.restyle('plot', {
+      x: [[x]],
+      y: [[y]],
+      z: [[z]]
+    }, [2]);
+
+    /* update live readout */
+    document.getElementById('rd-t').textContent = t.toFixed(2);
+    document.getElementById('rd-x').textContent = x.toFixed(3);
+    document.getElementById('rd-y').textContent = y.toFixed(3);
+    document.getElementById('rd-z').textContent = z.toFixed(3);
+  }
+
+  function animationStep() {
+    animT += ANIM_SPEED;
+    if (animT > T_MAX) {
+      animT = T_MAX;
+      moveParticle(animT);
+      stopAnimation();
+      return;
+    }
+    moveParticle(animT);
+    animId = requestAnimationFrame(animationStep);
+  }
+
+  function stopAnimation() {
+    if (animId) cancelAnimationFrame(animId);
+    animId      = null;
+    animPlaying = false;
+    const btn = document.getElementById('btnPlay');
+    btn.innerHTML = '▶ &nbsp;Play Animation';
+    btn.classList.remove('animating');
+  }
+
+  function resetReadout() {
+    ['rd-t','rd-x','rd-y','rd-z'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+  }
+
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    if (animPlaying) {
+      stopAnimation();
+      return;
+    }
+    /* Start / restart */
+    animT = 0;
+    animPlaying = true;
+    const btn = document.getElementById('btnPlay');
+    btn.innerHTML = '⏹ &nbsp;Stop';
+    btn.classList.add('animating');
+    animId = requestAnimationFrame(animationStep);
+  });
+
+</script>
+</body>
+</html>

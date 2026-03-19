@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Earth Rotation — Uniform Circular Motion</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Clash+Display:wght@500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══════════════════════════════════════════════
+       CSS VARIABLES — deep space palette
+    ══════════════════════════════════════════════ */
+    :root {
+      --space:       #060810;
+      --surface:     #0c0f1a;
+      --panel-bg:    rgba(10, 14, 26, 0.82);
+      --border:      rgba(255,255,255,0.07);
+      --border-hi:   rgba(255,255,255,0.14);
+      --text:        #dde4f0;
+      --text-dim:    #5a6380;
+      --text-mid:    #8892aa;
+      --green:       #39e8a0;
+      --red:         #ff6b6b;
+      --gold:        #f5c842;
+      --blue-glow:   #3b82f6;
+      --font-mono:   'DM Mono', monospace;
+      --font-display:'Clash Display', 'DM Mono', sans-serif;
+    }
+
+    /* ══════════════════════════════════════════════
+       RESET & BODY
+    ══════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--space);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      gap: 18px;
+      overflow-x: hidden;
+    }
+
+    /* starfield pseudo-element on body */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 12%  18%, rgba(255,255,255,0.55) 0%, transparent 100%),
+        radial-gradient(1px 1px at 78%  8%,  rgba(255,255,255,0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45%  72%, rgba(255,255,255,0.4)  0%, transparent 100%),
+        radial-gradient(1px 1px at 92%  55%, rgba(255,255,255,0.5)  0%, transparent 100%),
+        radial-gradient(1px 1px at 5%   85%, rgba(255,255,255,0.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65%  32%, rgba(255,255,255,0.5)  0%, transparent 100%),
+        radial-gradient(1px 1px at 33%  48%, rgba(255,255,255,0.3)  0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 55% 90%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 20%  60%, rgba(255,255,255,0.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 88%  25%, rgba(255,255,255,0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 72%  68%, rgba(255,255,255,0.3)  0%, transparent 100%),
+        radial-gradient(1px 1px at 38%  10%, rgba(255,255,255,0.5)  0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 8% 42%, rgba(255,255,255,0.55) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ══════════════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════════════ */
+    header {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+    }
+
+    header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(1.2rem, 3vw, 1.8rem);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    header h1 span {
+      color: var(--gold);
+    }
+
+    header p {
+      font-size: 0.67rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ══════════════════════════════════════════════
+       MAIN SCENE WRAPPER
+    ══════════════════════════════════════════════ */
+    .scene {
+      position: relative;
+      z-index: 2;
+      width: min(560px, 94vw);
+      aspect-ratio: 1;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      /* subtle atmospheric halo */
+      box-shadow:
+        0 0 0 1px rgba(59,130,246,0.15),
+        0 0 40px rgba(59,130,246,0.08),
+        0 0 80px rgba(59,130,246,0.04);
+    }
+
+    /* ── Overlaid data panel (top-right of scene) ── */
+    .data-panel {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-hi);
+      border-radius: 10px;
+      padding: 14px 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      min-width: 186px;
+    }
+
+    .data-panel-title {
+      font-family: var(--font-display);
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 7px;
+    }
+    .data-row:last-child { margin-bottom: 0; }
+
+    .data-key {
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .data-val {
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .data-val.earth  { color: var(--blue-glow); }
+    .data-val.vel    { color: var(--green); }
+    .data-val.acc    { color: var(--red); }
+    .data-val.angle  { color: var(--gold); }
+
+    /* ── Angle badge (bottom-left of scene) ── */
+    .angle-badge {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      backdrop-filter: blur(8px);
+      font-size: 0.63rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .angle-badge span { color: var(--gold); font-weight: 500; font-size: 0.7rem; }
+
+    /* ══════════════════════════════════════════════
+       CONTROLS BAR
+    ══════════════════════════════════════════════ */
+    .controls {
+      position: relative;
+      z-index: 2;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-hi);
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      width: min(560px, 94vw);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Play/Pause button */
+    #btnPlay {
+      background: none;
+      border: 1px solid var(--border-hi);
+      border-radius: 7px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #btnPlay:hover { border-color: var(--gold); color: var(--gold); }
+    #btnPlay.playing { border-color: var(--green); color: var(--green); }
+
+    /* Slider group */
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .slider-group label {
+      font-size: 0.63rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.1);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: 2px solid var(--space);
+      box-shadow: 0 0 8px rgba(245,200,66,0.5);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: 2px solid var(--space);
+    }
+
+    #speedDisplay {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--gold);
+      min-width: 52px;
+      text-align: right;
+    }
+
+    /* ══════════════════════════════════════════════
+       LEGEND ROW
+    ══════════════════════════════════════════════ */
+    .legend {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.62rem;
+      color: var(--text-dim);
+    }
+
+    .legend-line {
+      width: 24px;
+      height: 2.5px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <h1>Uniform <span>Circular Motion</span></h1>
+  <p>Earth Equatorial Rotation · Top-Down View (North Pole)</p>
+</header>
+
+<!-- ── Main scene ── -->
+<div class="scene">
+  <canvas id="cvs" width="560" height="560"></canvas>
+
+  <!-- Data overlay panel -->
+  <div class="data-panel">
+    <div class="data-panel-title">Live Telemetry</div>
+
+    <div class="data-row">
+      <span class="data-key">Radius (R)</span>
+      <span class="data-val earth" id="d-r">6,378 km</span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">Period (T)</span>
+      <span class="data-val earth" id="d-period">86,164 s</span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">ω (rad/s)</span>
+      <span class="data-val earth" id="d-omega">7.292×10⁻⁵</span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">v  (tang.)</span>
+      <span class="data-val vel" id="d-v">464.7 m/s</span>
+    </div>
+    <div class="data-row">
+      <span class="data-key">aₒ (centripetal)</span>
+      <span class="data-val acc" id="d-ac">0.03369 m/s²</span>
+    </div>
+  </div>
+
+  <!-- Angle badge -->
+  <div class="angle-badge">
+    θ = <span id="d-angle">0.00°</span>
+  </div>
+</div>
+
+<!-- ── Controls ── -->
+<div class="controls">
+  <button id="btnPlay">▶ Play</button>
+
+  <div class="slider-group">
+    <label for="speedSlider">Time Speed</label>
+    <input type="range" id="speedSlider" min="1" max="200000" step="500" value="50000" />
+    <span id="speedDisplay">×50,000</span>
+  </div>
+</div>
+
+<!-- ── Legend ── -->
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-line" style="background:#39e8a0;"></div>
+    <span>Tangential Velocity (v)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#ff6b6b;"></div>
+    <span>Centripetal Acceleration (aₒ)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="width:12px;height:12px;border-radius:50%;background:#f5c842;"></div>
+    <span>Person on Equator</span>
+  </div>
+</div>
+
+
+<script>
+  /* ═════════════════════════════════════════════════════════════
+     CONSTANTS  (all SI unless noted)
+  ═════════════════════════════════════════════════════════════ */
+  const R_EARTH_M  = 6_378_000;           // Earth radius in metres
+  const R_EARTH_KM = 6378;                // km (for display)
+  const T_SIDEREAL = 86_164.1;            // sidereal day in seconds
+  const OMEGA      = (2 * Math.PI) / T_SIDEREAL;  // rad/s
+  const V_TANG     = OMEGA * R_EARTH_M;   // ≈ 464.7 m/s
+  const A_CENT     = OMEGA * OMEGA * R_EARTH_M;   // ≈ 0.03369 m/s²
+
+  /* ═════════════════════════════════════════════════════════════
+     CANVAS SETUP
+  ═════════════════════════════════════════════════════════════ */
+  const cvs = document.getElementById('cvs');
+  const ctx = cvs.getContext('2d');
+  const W   = cvs.width;    // 560
+  const H   = cvs.height;   // 560
+  const CX  = W / 2;        // centre x in pixels
+  const CY  = H / 2;        // centre y in pixels
+  const R   = W * 0.38;     // Earth radius in pixels (visual)
+
+  /* ═════════════════════════════════════════════════════════════
+     SIMULATION STATE
+  ═════════════════════════════════════════════════════════════ */
+  let theta    = 0;          // current angle (radians), 0 = rightward (3 o'clock)
+  let playing  = false;
+  let lastTS   = null;       // last animation-frame timestamp
+  let timeSpeed = 50_000;    // multiplier over real time
+
+  /* ═════════════════════════════════════════════════════════════
+     EARTH TEXTURE — tiled dots simulating landmass in canvas
+     We pre-draw a simple stylized continent silhouette.
+  ═════════════════════════════════════════════════════════════ */
+
+  /* Stylised "land" spots expressed as [cx_frac, cy_frac, rx_frac, ry_frac]
+     relative to the Earth disk (centre + radii as fractions of R). */
+  const LANDMASSES = [
+    /* N. America */    [ 0.28, -0.18, 0.24, 0.21 ],
+    /* S. America */    [ 0.33,  0.32, 0.14, 0.22 ],
+    /* Europe/Africa */ [-0.08, -0.05, 0.14, 0.36 ],
+    /* Asia */          [-0.22, -0.22, 0.40, 0.25 ],
+    /* Australia */     [-0.32,  0.28, 0.14, 0.12 ],
+    /* Antarctica */    [  0.0,  0.60, 0.38, 0.09 ],
+  ];
+
+  /* ═════════════════════════════════════════════════════════════
+     DRAW HELPERS
+  ═════════════════════════════════════════════════════════════ */
+
+  /**
+   * Draw an arrow from (px,py) in canvas direction (dx,dy).
+   * Both dx,dy are already in canvas pixels.
+   */
+  function drawArrow(px, py, dx, dy, color, lineWidth = 2.5) {
+    const len = Math.hypot(dx, dy);
+    if (len < 2) return;
+    const headLen = Math.min(18, len * 0.32);
+    const angle   = Math.atan2(dy, dx);
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle   = color;
+    ctx.lineWidth   = lineWidth;
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 8;
+
+    /* shaft */
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + dx, py + dy);
+    ctx.stroke();
+
+    /* arrowhead */
+    const tx = px + dx, ty = py + dy;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - headLen * Math.cos(angle - Math.PI / 7),
+               ty - headLen * Math.sin(angle - Math.PI / 7));
+    ctx.lineTo(tx - headLen * Math.cos(angle + Math.PI / 7),
+               ty - headLen * Math.sin(angle + Math.PI / 7));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* ═════════════════════════════════════════════════════════════
+     MAIN DRAW FUNCTION
+  ═════════════════════════════════════════════════════════════ */
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    /* ── 1. BACKGROUND (deep space) ── */
+    ctx.fillStyle = '#060810';
+    ctx.fillRect(0, 0, W, H);
+
+    /* faint concentric orbit guide rings */
+    ctx.save();
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.arc(CX, CY, R + i * 28, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(59,130,246,${0.04 - i * 0.01})`;
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    /* ── 2. EARTH BASE (ocean) ── */
+    const earthGrad = ctx.createRadialGradient(
+      CX - R * 0.3, CY - R * 0.3, R * 0.05,
+      CX, CY, R
+    );
+    earthGrad.addColorStop(0.0, '#1e4d8c');
+    earthGrad.addColorStop(0.5, '#163a6e');
+    earthGrad.addColorStop(1.0, '#0d2548');
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CX, CY, R, 0, Math.PI * 2);
+    ctx.fillStyle = earthGrad;
+    ctx.fill();
+    /* outer atmosphere glow */
+    ctx.shadowColor = '#3b82f6';
+    ctx.shadowBlur  = 28;
+    ctx.strokeStyle = 'rgba(59,130,246,0.35)';
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    /* ── 3. ROTATING LANDMASSES ── */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CX, CY, R - 1, 0, Math.PI * 2);
+    ctx.clip();  /* keep landmass ellipses inside Earth disk */
+
+    /* rotate whole canvas around Earth centre by current angle */
+    ctx.translate(CX, CY);
+    ctx.rotate(-theta);  /* counter-clockwise: negate theta */
+    ctx.translate(-CX, -CY);
+
+    for (const [cfx, cfy, rfx, rfy] of LANDMASSES) {
+      const lx = CX + cfx * R;
+      const ly = CY + cfy * R;
+      const lrx = rfx * R;
+      const lry = rfy * R;
+
+      const lGrad = ctx.createRadialGradient(lx, ly, 0, lx, ly, Math.max(lrx, lry));
+      lGrad.addColorStop(0.0, '#4a9a5a');
+      lGrad.addColorStop(0.6, '#3a7a48');
+      lGrad.addColorStop(1.0, 'rgba(40,90,50,0)');
+
+      ctx.beginPath();
+      ctx.ellipse(lx, ly, lrx, lry, 0, 0, Math.PI * 2);
+      ctx.fillStyle = lGrad;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    /* ── 4. EQUATOR LINE (fixed, dashed) ── */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CX, CY, R, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(245,200,66,0.25)';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    /* ── 5. EQUATOR RADIUS LINE (faint spoke to person) ── */
+    const px = CX + R * Math.cos(theta);
+    const py = CY - R * Math.sin(theta);   /* canvas y is flipped */
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(px, py);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth   = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    /* ── 6. NORTH POLE MARKER ── */
+    ctx.save();
+    ctx.fillStyle   = 'rgba(255,255,255,0.8)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.arc(CX, CY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle  = 'rgba(255,255,255,0.4)';
+    ctx.font       = '600 10px DM Mono, monospace';
+    ctx.textAlign  = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', CX, CY);
+    ctx.restore();
+
+    /* ── 7. VELOCITY VECTOR (green, tangent to rotation) ──
+       Tangent direction for CCW rotation: (-sin θ, cos θ) in math coords
+       In canvas coords: (-sin θ, +sin θ ... wait: canvas y flipped)
+       Math tangent CCW: (-sin θ, +cos θ)
+       Canvas: x → same, y → negated, so: (-sin θ, -cos θ)
+       We'll scale visually. */
+    const VEL_SCALE  = R * 0.45;   /* visual length of velocity arrow */
+    const vdx =  -Math.sin(theta) * VEL_SCALE;
+    const vdy =  -Math.cos(theta) * VEL_SCALE;   /* canvas y flip applied */
+    drawArrow(px, py, vdx, vdy, '#39e8a0', 2.5);
+
+    /* ── 8. CENTRIPETAL ACCELERATION VECTOR (red, toward centre) ── */
+    const AC_SCALE  = R * 0.36;    /* visual length */
+    /* direction from person → centre = (CX - px, CY - py), normalised */
+    const toCX = CX - px;
+    const toCY = CY - py;
+    const dist  = Math.hypot(toCX, toCY);
+    const acdx  = (toCX / dist) * AC_SCALE;
+    const acdy  = (toCY / dist) * AC_SCALE;
+    drawArrow(px, py, acdx, acdy, '#ff6b6b', 2.5);
+
+    /* ── 9. PERSON DOT ── */
+    /* outer pulse ring */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(px, py, 11, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(245,200,66,0.18)';
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+    /* inner glow */
+    const pgrd = ctx.createRadialGradient(px, py, 0, px, py, 10);
+    pgrd.addColorStop(0,   'rgba(245,200,66,0.5)');
+    pgrd.addColorStop(1,   'rgba(245,200,66,0)');
+    ctx.fillStyle = pgrd;
+    ctx.beginPath();
+    ctx.arc(px, py, 10, 0, Math.PI * 2);
+    ctx.fill();
+    /* core dot */
+    ctx.fillStyle   = '#f5c842';
+    ctx.strokeStyle = '#060810';
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    /* ── 10. UPDATE DATA PANEL ── */
+    /* angle in degrees, wrapped 0–360 */
+    const deg = ((theta * 180 / Math.PI) % 360 + 360) % 360;
+    document.getElementById('d-angle').textContent = deg.toFixed(1) + '°';
+  }
+
+  /* ═════════════════════════════════════════════════════════════
+     POPULATE STATIC DATA PANEL FIELDS
+  ═════════════════════════════════════════════════════════════ */
+  document.getElementById('d-r').textContent     = `${R_EARTH_KM.toLocaleString()} km`;
+  document.getElementById('d-period').textContent= `${T_SIDEREAL.toLocaleString()} s`;
+  document.getElementById('d-omega').textContent = `7.292×10⁻⁵ rad/s`;
+  document.getElementById('d-v').textContent     = `${V_TANG.toFixed(1)} m/s`;
+  document.getElementById('d-ac').textContent    = `${A_CENT.toFixed(5)} m/s²`;
+
+  /* ═════════════════════════════════════════════════════════════
+     ANIMATION LOOP
+  ═════════════════════════════════════════════════════════════ */
+  function animate(ts) {
+    if (!playing) return;
+
+    if (lastTS === null) lastTS = ts;
+    const dtReal = (ts - lastTS) / 1000;   /* real elapsed seconds */
+    lastTS = ts;
+
+    /* advance angle: ω_real × timeSpeed × dt */
+    theta += OMEGA * timeSpeed * dtReal;
+
+    draw();
+    requestAnimationFrame(animate);
+  }
+
+  /* ═════════════════════════════════════════════════════════════
+     EVENT LISTENERS
+  ═════════════════════════════════════════════════════════════ */
+  const btnPlay      = document.getElementById('btnPlay');
+  const speedSlider  = document.getElementById('speedSlider');
+  const speedDisplay = document.getElementById('speedDisplay');
+
+  btnPlay.addEventListener('click', () => {
+    playing = !playing;
+    lastTS  = null;
+    if (playing) {
+      btnPlay.textContent = '⏸ Pause';
+      btnPlay.classList.add('playing');
+      requestAnimationFrame(animate);
+    } else {
+      btnPlay.textContent = '▶ Play';
+      btnPlay.classList.remove('playing');
+    }
+  });
+
+  speedSlider.addEventListener('input', () => {
+    timeSpeed = parseInt(speedSlider.value, 10);
+    const label = timeSpeed.toLocaleString();
+    speedDisplay.textContent = `×${label}`;
+  });
+
+  /* ═════════════════════════════════════════════════════════════
+     INITIAL STATIC DRAW
+  ═════════════════════════════════════════════════════════════ */
+  draw();
+</script>
+</body>
+</html>

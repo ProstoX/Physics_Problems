@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Motion — Velocity & Acceleration</title>
+<!--
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║  PARAMETRIC VECTOR FIELD VISUALIZER                           ║
+  ║                                                               ║
+  ║  Position     r(t) = (3t²)i + (5t − 8t²)j                   ║
+  ║  Velocity     v(t) = (6t)i + (5 − 16t)j                     ║
+  ║  Acceleration a(t) = 6i − 16j   [constant vector]           ║
+  ║                                                               ║
+  ║  Domain: t ∈ [0, 1.5]                                        ║
+  ║  Trajectory: x ∈ [0, 6.75],  y ∈ [−10.5, ≈0.78]            ║
+  ╚═══════════════════════════════════════════════════════════════╝
+
+  Aesthetic: Technical-editorial — inspired by engineering drawing
+  sheets and scientific journals. Tight grid, ink-on-white, precise
+  typography, accent colours used sparingly and deliberately.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ════════════════════════════════════════════════════════════
+   RESET & CSS TOKENS
+════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Ink-on-linen palette — engineering drawing feel */
+  --linen:       #f4f1eb;
+  --linen2:      #ede9e0;
+  --ink:         #1c1a17;
+  --ink2:        #3a3730;
+  --rule:        #c8c3b8;      /* grid lines / borders */
+  --rule-dim:    #ddd9d2;
+  --dim:         #8a8278;
+  --mid:         #5a5650;
+
+  /* Accent colours — used only for vectors */
+  --vel:         #1a7a3f;      /* deep green: velocity */
+  --vel-glow:    rgba(26,122,63,0.22);
+  --acc:         #b91c1c;      /* deep red: acceleration */
+  --acc-glow:    rgba(185,28,28,0.22);
+
+  --particle:    #1e40af;      /* deep blue: particle dot */
+  --path:        rgba(100,95,88,0.35);  /* ghost trajectory */
+
+  --highlight:   #92400e;      /* amber-brown: time accent */
+}
+
+/* ════════════════════════════════════════════════════════════
+   PAGE SHELL
+════════════════════════════════════════════════════════════ */
+body {
+  background: var(--linen);
+  color: var(--ink);
+  font-family: 'Roboto Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 52px;
+  gap: 20px;
+
+  /* Graph-paper texture: two perpendicular ruling lines */
+  background-image:
+    linear-gradient(var(--rule-dim) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-dim) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   HEADER
+════════════════════════════════════════════════════════════ */
+header {
+  text-align: center;
+  max-width: 860px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--ink);
+  width: 100%;
+  max-width: 1060px;
+}
+.hdr-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.hdr-top h1 {
+  font-family: 'Libre Baskerville', serif;
+  font-size: clamp(1.2rem, 3vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.hdr-top .eq-strip {
+  font-size: 0.7rem;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.hdr-sub {
+  margin-top: 6px;
+  font-size: 0.65rem;
+  color: var(--dim);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ════════════════════════════════════════════════════════════
+   TWO-COLUMN LAYOUT
+════════════════════════════════════════════════════════════ */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 16px;
+  width: 100%;
+  max-width: 1060px;
+  align-items: start;
+}
+
+/* ════════════════════════════════════════════════════════════
+   CANVAS CARD
+════════════════════════════════════════════════════════════ */
+.canvas-card {
+  background: #fff;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  padding: 4px;
+  /* Drop shadow: classic technical drawing board look */
+  box-shadow: 4px 4px 0 var(--rule), 6px 6px 0 var(--rule-dim);
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 1px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   RIGHT-SIDE PANEL
+════════════════════════════════════════════════════════════ */
+.side { display: flex; flex-direction: column; gap: 14px; }
+
+/* Generic ruled card */
+.card {
+  background: #fff;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  padding: 13px 15px;
+  box-shadow: 3px 3px 0 var(--rule);
+}
+.card-title {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  padding-bottom: 9px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ── Data readout ─────────────────────────────────────────── */
+.data-block { display: flex; flex-direction: column; gap: 0; }
+
+.data-section {
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--rule-dim);
+}
+.data-section:last-child { border-bottom: none; padding-bottom: 0; }
+
+.ds-label {
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+  margin-bottom: 5px;
+}
+.ds-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ds-key {
+  font-size: 0.62rem;
+  color: var(--mid);
+  font-style: italic;
+  font-family: 'Libre Baskerville', serif;
+  white-space: nowrap;
+}
+.ds-val {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: right;
+  transition: color 0.1s;
+}
+.ds-val.vel { color: var(--vel); }
+.ds-val.acc { color: var(--acc); }
+.ds-val.pos { color: var(--particle); }
+.ds-val.time {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--highlight);
+  font-family: 'Libre Baskerville', serif;
+}
+
+/* ── Vector legend ────────────────────────────────────────── */
+.legend { display: flex; flex-direction: column; gap: 9px; }
+.leg-row { display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: var(--ink2); }
+.leg-arrow {
+  display: flex; align-items: center; gap: 0;
+  flex-shrink: 0;
+}
+.leg-shaft {
+  height: 2.5px; border-radius: 1px;
+  flex-shrink: 0;
+}
+.leg-head {
+  width: 0; height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  flex-shrink: 0;
+}
+.leg-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.leg-dashed {
+  width: 20px; height: 0;
+  border-top: 2px dashed; flex-shrink: 0;
+}
+.leg-sub {
+  font-size: 0.58rem;
+  color: var(--dim);
+  font-family: 'Libre Baskerville', serif;
+  font-style: italic;
+}
+
+/* ── Time display ─────────────────────────────────────────── */
+.time-display {
+  text-align: center;
+  padding: 6px 0 2px;
+}
+.time-t {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--highlight);
+  line-height: 1;
+}
+.time-t .unit { font-size: 0.9rem; font-weight: 400; color: var(--dim); margin-left: 3px; }
+
+/* ── Controls ─────────────────────────────────────────────── */
+.controls { display: flex; flex-direction: column; gap: 10px; }
+
+/* Slider */
+.slider-wrap { display: flex; flex-direction: column; gap: 5px; }
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--rule);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--highlight);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--highlight);
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--highlight);
+  border: 2px solid #fff;
+  cursor: pointer;
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: 8px; }
+.btn {
+  flex: 1;
+  padding: 10px 0;
+  background: transparent;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  box-shadow: 2px 2px 0 var(--rule);
+}
+.btn:hover  { background: var(--linen2); }
+.btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--rule); }
+.btn.primary {
+  background: var(--ink);
+  color: var(--linen);
+}
+.btn.primary:hover { background: var(--ink2); }
+
+/* ── Speed control ────────────────────────────────────────── */
+.speed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.6rem;
+  color: var(--dim);
+}
+.speed-btns { display: flex; gap: 4px; }
+.speed-btn {
+  padding: 3px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: transparent;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--mid);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.speed-btn.active { background: var(--ink); color: var(--linen); border-color: var(--ink); }
+.speed-btn:hover:not(.active) { background: var(--linen2); }
+
+/* ════════════════════════════════════════════════════════════
+   BOTTOM FORMULA BAR
+════════════════════════════════════════════════════════════ */
+.formula-bar {
+  width: 100%;
+  max-width: 1060px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.formula-cell {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 9px 12px;
+  font-family: 'Libre Baskerville', serif;
+  font-size: 0.76rem;
+  line-height: 1.75;
+  color: var(--mid);
+}
+.formula-cell .f-head {
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  display: block;
+  margin-bottom: 2px;
+}
+.fc-vel .f-head { color: var(--vel); }
+.fc-acc .f-head { color: var(--acc); }
+.formula-cell em { font-style: italic; }
+</style>
+</head>
+
+<body>
+
+<!-- ════════════ HEADER ══════════════════════════════════════ -->
+<header>
+  <div class="hdr-top">
+    <h1>Parametric Motion — Vector Field</h1>
+    <span class="eq-strip">r(t) = (3t²)i + (5t − 8t²)j</span>
+  </div>
+  <div class="hdr-sub">velocity &amp; acceleration vectors · t ∈ [0, 1.5 s]</div>
+</header>
+
+<!-- ════════════ MAIN LAYOUT ═════════════════════════════════ -->
+<div class="layout">
+
+  <!-- Canvas -->
+  <div class="canvas-card">
+    <canvas id="c"></canvas>
+  </div>
+
+  <!-- Right panel -->
+  <div class="side">
+
+    <!-- Big time readout -->
+    <div class="card">
+      <div class="card-title">Current Time</div>
+      <div class="time-display">
+        <div class="time-t"><span id="bigT">0.000</span><span class="unit">s</span></div>
+      </div>
+    </div>
+
+    <!-- Numerical data -->
+    <div class="card">
+      <div class="card-title">State Vector</div>
+      <div class="data-block">
+
+        <div class="data-section">
+          <div class="ds-label">Position r(t)</div>
+          <div class="ds-row">
+            <span class="ds-key">x =</span>
+            <span class="ds-val pos" id="dPx">0.000</span>
+          </div>
+          <div class="ds-row">
+            <span class="ds-key">y =</span>
+            <span class="ds-val pos" id="dPy">0.000</span>
+          </div>
+        </div>
+
+        <div class="data-section">
+          <div class="ds-label">Velocity v(t)</div>
+          <div class="ds-row">
+            <span class="ds-key">vₓ =</span>
+            <span class="ds-val vel" id="dVx">0.000</span>
+          </div>
+          <div class="ds-row">
+            <span class="ds-key">v_y =</span>
+            <span class="ds-val vel" id="dVy">5.000</span>
+          </div>
+        </div>
+
+        <div class="data-section">
+          <div class="ds-label">Acceleration a(t)</div>
+          <div class="ds-row">
+            <span class="ds-key">aₓ =</span>
+            <span class="ds-val acc" id="dAx">6.000</span>
+          </div>
+          <div class="ds-row">
+            <span class="ds-key">a_y =</span>
+            <span class="ds-val acc" id="dAy">−16.000</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="card controls">
+      <div class="card-title">Controls</div>
+
+      <!-- Time slider -->
+      <div class="slider-wrap">
+        <div class="slider-label">
+          <span>t = 0.000 s</span>
+          <span id="sliderVal">0.000 s</span>
+          <span>t = 1.500 s</span>
+        </div>
+        <input type="range" id="tSlider" min="0" max="1500" value="0" step="1">
+      </div>
+
+      <!-- Play / Reset -->
+      <div class="btn-row">
+        <button class="btn primary" id="playBtn">▶ Play</button>
+        <button class="btn"         id="resetBtn">↺ Reset</button>
+      </div>
+
+      <!-- Speed -->
+      <div class="speed-row">
+        <span>Speed:</span>
+        <div class="speed-btns">
+          <button class="speed-btn" data-speed="0.3">0.3×</button>
+          <button class="speed-btn active" data-speed="0.6">0.6×</button>
+          <button class="speed-btn" data-speed="1">1×</button>
+          <button class="speed-btn" data-speed="2">2×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card">
+      <div class="card-title">Legend</div>
+      <div class="legend">
+
+        <div class="leg-row">
+          <div class="leg-dot" style="background:var(--particle);border:1.5px solid #fff;box-shadow:0 0 6px rgba(30,64,175,0.4)"></div>
+          <span>Particle r(t)</span>
+        </div>
+
+        <div class="leg-row">
+          <div class="leg-dashed" style="border-color:var(--path)"></div>
+          <span style="color:var(--dim)">Trajectory path</span>
+        </div>
+
+        <div class="leg-row">
+          <!-- Green velocity arrow swatch -->
+          <div class="leg-arrow">
+            <div class="leg-shaft" style="width:16px;background:var(--vel)"></div>
+            <div class="leg-head"  style="border-left:6px solid var(--vel)"></div>
+          </div>
+          <div>
+            Velocity v(t)
+            <div class="leg-sub">v = (6t, 5 − 16t)</div>
+          </div>
+        </div>
+
+        <div class="leg-row">
+          <!-- Red acceleration arrow swatch -->
+          <div class="leg-arrow">
+            <div class="leg-shaft" style="width:16px;background:var(--acc)"></div>
+            <div class="leg-head"  style="border-left:6px solid var(--acc)"></div>
+          </div>
+          <div>
+            Acceleration a(t)
+            <div class="leg-sub">a = (6, −16) [const]</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /side -->
+</div><!-- /layout -->
+
+<!-- ════════════ FORMULA BAR ═════════════════════════════════ -->
+<div class="formula-bar">
+  <div class="formula-cell">
+    <span class="f-head">Position</span>
+    <em>r</em>(t) = 3t² <em>i</em> + (5t − 8t²) <em>j</em>
+  </div>
+  <div class="formula-cell fc-vel">
+    <span class="f-head">Velocity</span>
+    <em>v</em>(t) = 6t <em>i</em> + (5 − 16t) <em>j</em>
+  </div>
+  <div class="formula-cell fc-acc">
+    <span class="f-head">Acceleration</span>
+    <em>a</em>(t) = 6 <em>i</em> − 16 <em>j</em>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ──────────────────────────────────────────────────────────
+     §1  PHYSICS
+  ────────────────────────────────────────────────────────── */
+
+  /** Position r(t) = (3t², 5t − 8t²) */
+  function pos(t) { return { x: 3*t*t,  y: 5*t - 8*t*t }; }
+
+  /** Velocity v(t) = (6t, 5 − 16t) */
+  function vel(t) { return { x: 6*t,    y: 5 - 16*t   }; }
+
+  /** Acceleration a(t) = (6, −16)  — constant */
+  function acc()  { return { x: 6,      y: -16         }; }
+
+  // Domain
+  const T_MIN = 0, T_MAX = 1.5;
+
+  // Trajectory world bounds (found by sampling):
+  //   x ∈ [0, 6.75],  y ∈ [−10.5, ≈0.781]
+  // We'll add generous padding.
+  const WX0 = -0.8, WX1 = 7.5;
+  const WY0 = -11.5, WY1 = 2.0;
+
+  /* ──────────────────────────────────────────────────────────
+     §2  CANVAS & COORDINATE SYSTEM
+  ────────────────────────────────────────────────────────── */
+
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+
+  const CW = 720, CH = 680;
+  canvas.width = CW; canvas.height = CH;
+
+  // Plot margins
+  const PL = 58, PR = 24, PT = 24, PB = 52;
+  const PW = CW - PL - PR;
+  const PH = CH - PT - PB;
+
+  /** World → canvas X */
+  function wx(x) { return PL + (x - WX0) / (WX1 - WX0) * PW; }
+  /** World → canvas Y (inverted) */
+  function wy(y) { return CH - PB - (y - WY0) / (WY1 - WY0) * PH; }
+
+  /* ──────────────────────────────────────────────────────────
+     §3  VECTOR ARROW SCALING
+     The raw vectors can be large — we project them into world
+     units using a scale factor so the arrows sit on-screen but
+     preserve direction and relative magnitude.
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * World-unit scale for velocity arrows.
+   * |v_max| at t=0 = (0, 5), magnitude 5. We want ~15% of world width.
+   * Scale = (0.15 * worldW) / 5
+   */
+  const WORLD_W  = WX1 - WX0;                  // 8.3 units
+  const VEL_SCALE = (WORLD_W * 0.13) / 5;       // ≈ 0.216 units per (m/s)
+  const ACC_SCALE = (WORLD_W * 0.10) / 16;      // ≈ 0.052 units per (m/s²)
+  // (acceleration magnitude is sqrt(6²+16²)≈17.1, scale so it ≈ 10% worldW)
+
+  /* ──────────────────────────────────────────────────────────
+     §4  DRAW — BACKGROUND, GRID, AXES
+  ────────────────────────────────────────────────────────── */
+
+  function drawBackground() {
+    // Clean white plot area
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // ── Minor grid ──────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(200,195,184,0.55)';
+    ctx.lineWidth   = 0.6;
+    for (let x = Math.ceil(WX0); x <= WX1; x++) {
+      ctx.beginPath(); ctx.moveTo(wx(x), PT); ctx.lineTo(wx(x), CH-PB); ctx.stroke();
+    }
+    for (let y = Math.ceil(WY0); y <= WY1; y++) {
+      ctx.beginPath(); ctx.moveTo(PL, wy(y)); ctx.lineTo(CW-PR, wy(y)); ctx.stroke();
+    }
+
+    // ── Principal axes (y=0, x=0) ───────────────────────────
+    ctx.strokeStyle = 'rgba(90,86,80,0.5)';
+    ctx.lineWidth   = 1.2;
+    // y = 0
+    ctx.beginPath(); ctx.moveTo(PL, wy(0)); ctx.lineTo(CW-PR, wy(0)); ctx.stroke();
+    // x = 0
+    ctx.beginPath(); ctx.moveTo(wx(0), PT); ctx.lineTo(wx(0), CH-PB); ctx.stroke();
+
+    // ── Tick labels ─────────────────────────────────────────
+    ctx.font      = '10px "Roboto Mono", monospace';
+    ctx.fillStyle = 'rgba(90,86,80,0.65)';
+
+    ctx.textAlign = 'center';
+    for (let x = Math.ceil(WX0); x <= Math.floor(WX1); x++) {
+      if (x === 0) continue;
+      ctx.strokeStyle = 'rgba(90,86,80,0.3)'; ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.moveTo(wx(x), wy(0)); ctx.lineTo(wx(x), wy(0)+5); ctx.stroke();
+      ctx.fillText(x, wx(x), wy(0)+16);
+    }
+    ctx.textAlign = 'right';
+    for (let y = Math.ceil(WY0); y <= Math.floor(WY1); y += 2) {
+      if (y === 0) continue;
+      ctx.strokeStyle = 'rgba(90,86,80,0.3)'; ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.moveTo(wx(0), wy(y)); ctx.lineTo(wx(0)-5, wy(y)); ctx.stroke();
+      ctx.fillText(y, wx(0)-8, wy(y)+4);
+    }
+
+    // Origin label
+    ctx.textAlign = 'right';
+    ctx.fillText('0', wx(0)-7, wy(0)+15);
+
+    // Axis letters
+    ctx.fillStyle = 'rgba(90,86,80,0.55)';
+    ctx.font      = '11px "Libre Baskerville", serif';
+    ctx.fillStyle = 'rgba(90,86,80,0.6)';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#5a5650';
+    ctx.fillText('x', CW-PR+16, wy(0)+5);
+    ctx.fillText('y', wx(0), PT-9);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §5  DRAW — TRAJECTORY GHOST PATH
+  ────────────────────────────────────────────────────────── */
+
+  function drawTrajectory() {
+    const steps = 200;
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(100,95,88,0.30)';
+    ctx.lineWidth   = 1.8;
+    ctx.setLineDash([6, 5]);
+
+    for (let i = 0; i <= steps; i++) {
+      const t  = T_MIN + (T_MAX - T_MIN) * (i / steps);
+      const p  = pos(t);
+      i === 0
+        ? ctx.moveTo(wx(p.x), wy(p.y))
+        : ctx.lineTo(wx(p.x), wy(p.y));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Start and end markers (open circles)
+    [[0,'t=0'], [T_MAX,'t=1.5']].forEach(([t, label]) => {
+      const p = pos(t);
+      ctx.strokeStyle = 'rgba(100,95,88,0.55)';
+      ctx.lineWidth   = 1;
+      ctx.fillStyle   = 'rgba(244,241,235,0.9)';
+      ctx.beginPath(); ctx.arc(wx(p.x), wy(p.y), 4, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle = 'rgba(90,86,80,0.6)';
+      ctx.font      = '9px "Roboto Mono", monospace';
+      ctx.textAlign = t === 0 ? 'right' : 'left';
+      const offX    = t === 0 ? -7 : 7;
+      ctx.fillText(label, wx(p.x)+offX, wy(p.y)+4);
+    });
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §6  DRAW — VECTOR ARROW
+     Draws an arrow from world point (x0,y0) by vector (dvx,dvy)
+     in world units scaled by `scale`.
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * @param {number} x0   world x of arrow base
+   * @param {number} y0   world y of arrow base
+   * @param {number} dvx  vector x component (unscaled)
+   * @param {number} dvy  vector y component (unscaled)
+   * @param {number} scale world-unit scale factor
+   * @param {string} color CSS colour
+   * @param {string} label short text label
+   */
+  function drawArrow(x0, y0, dvx, dvy, scale, color, label) {
+    // Arrow tip in world coords
+    const x1  = x0 + dvx * scale;
+    const y1  = y0 + dvy * scale;
+
+    // Convert to canvas coords
+    const cx0 = wx(x0), cy0 = wy(y0);
+    const cx1 = wx(x1), cy1 = wy(y1);
+
+    // Arrow shaft
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2.2;
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = color.replace(')', ',0.35)').includes('rgba') ? color : 'transparent';
+    ctx.shadowBlur  = 6;
+
+    ctx.beginPath();
+    ctx.moveTo(cx0, cy0);
+    ctx.lineTo(cx1, cy1);
+    ctx.stroke();
+
+    // Arrowhead (triangle at tip)
+    const angle  = Math.atan2(cy1 - cy0, cx1 - cx0);
+    const hLen   = 11; // head length in canvas pixels
+    const hAngle = 0.38; // half-angle of head in radians
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx1, cy1);
+    ctx.lineTo(
+      cx1 - hLen * Math.cos(angle - hAngle),
+      cy1 - hLen * Math.sin(angle - hAngle)
+    );
+    ctx.lineTo(
+      cx1 - hLen * Math.cos(angle + hAngle),
+      cy1 - hLen * Math.sin(angle + hAngle)
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+    // Label at midpoint of arrow
+    const mx = (cx0 + cx1) / 2, my = (cy0 + cy1) / 2;
+    // Perpendicular offset so label doesn't sit on the line
+    const nx = -(cy1 - cy0), ny = (cx1 - cx0);
+    const nLen = Math.sqrt(nx*nx + ny*ny) || 1;
+    const ox = (nx / nLen) * 13, oy = (ny / nLen) * 13;
+
+    ctx.fillStyle = color;
+    ctx.font      = '500 10px "Roboto Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, mx + ox, my + oy + 4);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §7  DRAW — PARTICLE DOT WITH TRAIL
+  ────────────────────────────────────────────────────────── */
+
+  /** Ring of past positions for the fading trail */
+  let trail = [];
+  const TRAIL_MAX = 80;
+
+  function drawTrail() {
+    if (trail.length < 2) return;
+    for (let i = 1; i < trail.length; i++) {
+      const alpha = (i / trail.length) * 0.55;
+      ctx.strokeStyle = `rgba(30,64,175,${alpha})`;
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(wx(trail[i-1].x), wy(trail[i-1].y));
+      ctx.lineTo(wx(trail[i].x),   wy(trail[i].y));
+      ctx.stroke();
+    }
+  }
+
+  function drawParticle(p) {
+    const px = wx(p.x), py = wy(p.y);
+
+    // Outer glow halo
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, 16);
+    grad.addColorStop(0, 'rgba(30,64,175,0.25)');
+    grad.addColorStop(1, 'rgba(30,64,175,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(px, py, 16, 0, Math.PI*2); ctx.fill();
+
+    // Core dot
+    ctx.fillStyle   = '#1e40af';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth   = 2;
+    ctx.shadowColor = 'rgba(30,64,175,0.6)';
+    ctx.shadowBlur  = 10;
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §8  FULL RENDER PASS
+  ────────────────────────────────────────────────────────── */
+
+  function render(t) {
+    const p = pos(t);
+    const v = vel(t);
+    const a = acc();
+
+    drawBackground();
+    drawTrajectory();
+    drawTrail();
+
+    // Velocity arrow (green) — scale to world units
+    drawArrow(p.x, p.y, v.x, v.y, VEL_SCALE, '#1a7a3f', 'v(t)');
+
+    // Acceleration arrow (red) — scale to world units
+    drawArrow(p.x, p.y, a.x, a.y, ACC_SCALE, '#b91c1c', 'a');
+
+    drawParticle(p);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §9  DOM HUD UPDATES
+  ────────────────────────────────────────────────────────── */
+
+  const elBigT   = document.getElementById('bigT');
+  const elPx     = document.getElementById('dPx');
+  const elPy     = document.getElementById('dPy');
+  const elVx     = document.getElementById('dVx');
+  const elVy     = document.getElementById('dVy');
+  const elAx     = document.getElementById('dAx');
+  const elAy     = document.getElementById('dAy');
+  const elSlVal  = document.getElementById('sliderVal');
+
+  function fmt(n, dp = 4) {
+    const s = n.toFixed(dp);
+    return n < 0 ? s : ' ' + s;  // align positive numbers
+  }
+
+  function updateHUD(t) {
+    const p = pos(t), v = vel(t), a = acc();
+
+    elBigT.textContent  = t.toFixed(3);
+    elSlVal.textContent = `${t.toFixed(3)} s`;
+
+    elPx.textContent = fmt(p.x);
+    elPy.textContent = fmt(p.y);
+    elVx.textContent = fmt(v.x);
+    elVy.textContent = fmt(v.y);
+    elAx.textContent = fmt(a.x);
+    elAy.textContent = fmt(a.y);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §10  ANIMATION LOOP
+  ────────────────────────────────────────────────────────── */
+
+  let animId   = null;
+  let simTime  = 0;
+  let lastTS   = null;
+  let playing  = false;
+  let simSpeed = 0.6;   // default multiplier
+
+  function tick(ts) {
+    if (lastTS === null) { lastTS = ts; animId = requestAnimationFrame(tick); return; }
+    const dt = Math.min((ts - lastTS) / 1000, 0.05) * simSpeed;
+    lastTS = ts;
+
+    simTime = Math.min(simTime + dt, T_MAX);
+
+    // Sync slider
+    tSlider.value = Math.round(simTime * 1000);
+
+    // Update trail
+    const p = pos(simTime);
+    trail.push({ x: p.x, y: p.y });
+    if (trail.length > TRAIL_MAX) trail.shift();
+
+    render(simTime);
+    updateHUD(simTime);
+
+    if (simTime >= T_MAX) {
+      playing = false;
+      playBtn.textContent = '▶ Play';
+      lastTS = null;
+      return;
+    }
+    animId = requestAnimationFrame(tick);
+  }
+
+  function startPlay() {
+    if (playing) return;
+    if (simTime >= T_MAX) { fullReset(); }
+    playing = true;
+    playBtn.textContent = '⏸ Pause';
+    lastTS = null;
+    animId = requestAnimationFrame(tick);
+  }
+
+  function pausePlay() {
+    playing = false;
+    cancelAnimationFrame(animId);
+    animId = null;
+    playBtn.textContent = '▶ Play';
+  }
+
+  function fullReset() {
+    pausePlay();
+    simTime = 0; trail = [];
+    tSlider.value = 0;
+    render(0);
+    updateHUD(0);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     §11  CONTROLS — BUTTONS, SLIDER, SPEED
+  ────────────────────────────────────────────────────────── */
+
+  const playBtn  = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const tSlider  = document.getElementById('tSlider');
+
+  playBtn.addEventListener('click', () => {
+    playing ? pausePlay() : startPlay();
+  });
+
+  resetBtn.addEventListener('click', fullReset);
+
+  // Manual scrub via slider
+  tSlider.addEventListener('input', () => {
+    pausePlay();
+    simTime = parseInt(tSlider.value) / 1000;
+    trail   = [];  // clear trail on manual scrub
+
+    // Rebuild trail up to simTime
+    const REBUILD = 60;
+    for (let i = 0; i <= REBUILD; i++) {
+      const t = simTime * (i / REBUILD);
+      const p = pos(t);
+      trail.push({ x: p.x, y: p.y });
+    }
+
+    render(simTime);
+    updateHUD(simTime);
+  });
+
+  // Speed buttons
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      simSpeed = parseFloat(btn.dataset.speed);
+    });
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     §12  INITIAL STATIC FRAME
+  ────────────────────────────────────────────────────────── */
+  render(0);
+  updateHUD(0);
+
+})();
+</script>
+</body>
+</html>

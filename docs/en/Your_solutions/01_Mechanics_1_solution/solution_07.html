@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Semicubical Parabola — Particle Motion</title>
+
+  <!-- ─── Google Fonts: IBM Plex Mono (data panel) + Syne (headings) ─── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ══════════════════════════════════════════════════════════
+       CSS CUSTOM PROPERTIES — dark industrial theme
+    ══════════════════════════════════════════════════════════ */
+    :root {
+      --bg:          #0b0d11;
+      --surface:     #13161d;
+      --border:      #242832;
+      --muted:       #3a3f50;
+      --text:        #cdd3e0;
+      --text-dim:    #6b7285;
+      --accent:      #e8e0c8;       /* warm off-white accent */
+      --green:       #4ade80;       /* velocity arrow */
+      --red:         #f87171;       /* acceleration arrow */
+      --curve:       #2e3448;       /* trajectory path */
+      --particle:    #f0c060;       /* moving dot */
+      --font-mono:   'IBM Plex Mono', monospace;
+      --font-display:'Syne', sans-serif;
+      --radius:      6px;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RESET & BASE
+    ══════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+      gap: 20px;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       PAGE HEADER
+    ══════════════════════════════════════════════════════════ */
+    header {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+    }
+
+    header h1 {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: clamp(1.1rem, 2.5vw, 1.55rem);
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       MAIN LAYOUT — canvas + sidebar
+    ══════════════════════════════════════════════════════════ */
+    .layout {
+      width: 100%;
+      max-width: 980px;
+      display: grid;
+      grid-template-columns: 1fr 230px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 700px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CANVAS WRAPPER
+    ══════════════════════════════════════════════════════════ */
+    .canvas-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* ── corner label ── */
+    .canvas-wrap .eq-label {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DATA PANEL (sidebar)
+    ══════════════════════════════════════════════════════════ */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .panel-section-title {
+      font-family: var(--font-display);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* key-value rows */
+    .kv-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      row-gap: 5px;
+      column-gap: 10px;
+      align-items: baseline;
+    }
+
+    .kv-key {
+      font-size: 0.63rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .kv-val {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text);
+      text-align: right;
+    }
+
+    /* color-coded labels for velocity / accel */
+    .kv-val.vel { color: var(--green); }
+    .kv-val.acc { color: var(--red);   }
+    .kv-val.hi  { color: var(--particle); }
+
+    /* legend */
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.64rem;
+      color: var(--text-dim);
+    }
+
+    .legend-swatch {
+      width: 22px;
+      height: 3px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CONTROLS BAR (below canvas+panel)
+    ══════════════════════════════════════════════════════════ */
+    .controls {
+      width: 100%;
+      max-width: 980px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* play/pause button */
+    #btnPlay {
+      background: none;
+      border: 1px solid var(--muted);
+      border-radius: var(--radius);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: border-color 0.18s, color 0.18s;
+      white-space: nowrap;
+    }
+    #btnPlay:hover { border-color: var(--accent); }
+    #btnPlay.playing { border-color: var(--particle); color: var(--particle); }
+
+    /* slider label */
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .slider-group label {
+      font-size: 0.66rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    /* custom range slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--muted);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--particle);
+      border: 2px solid var(--bg);
+      box-shadow: 0 0 6px color-mix(in srgb, var(--particle) 60%, transparent);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--particle);
+      border: 2px solid var(--bg);
+    }
+
+    #tDisplay {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--particle);
+      min-width: 44px;
+      text-align: right;
+    }
+
+    /* speed selector */
+    .speed-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+    }
+
+    select {
+      background: var(--bg);
+      border: 1px solid var(--muted);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      padding: 4px 8px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      outline: none;
+    }
+    select:hover { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════╗
+     ║            PAGE HEADER               ║
+     ╚══════════════════════════════════════╝ -->
+<header>
+  <h1>Semicubical Parabola</h1>
+  <p>x(t) = 2t² &nbsp;·&nbsp; y(t) = 3t³ &nbsp;·&nbsp; t ∈ [−2, 2]</p>
+</header>
+
+<!-- ╔══════════════════════════════════════╗
+     ║        CANVAS  +  DATA PANEL         ║
+     ╚══════════════════════════════════════╝ -->
+<div class="layout">
+
+  <!-- Canvas -->
+  <div class="canvas-wrap">
+    <span class="eq-label">y² = 1.125 · x³</span>
+    <canvas id="cvs" width="700" height="560"></canvas>
+  </div>
+
+  <!-- Sidebar data panel -->
+  <aside class="panel">
+
+    <!-- Kinematics -->
+    <div>
+      <div class="panel-section-title">Kinematics</div>
+      <div class="kv-grid" style="margin-top:10px;">
+        <span class="kv-key">t</span>
+        <span class="kv-val hi" id="d-t">0.000</span>
+
+        <span class="kv-key">x(t)</span>
+        <span class="kv-val" id="d-x">0.000</span>
+        <span class="kv-key">y(t)</span>
+        <span class="kv-val" id="d-y">0.000</span>
+
+        <span class="kv-key">vx</span>
+        <span class="kv-val vel" id="d-vx">0.000</span>
+        <span class="kv-key">vy</span>
+        <span class="kv-val vel" id="d-vy">0.000</span>
+        <span class="kv-key">|v|</span>
+        <span class="kv-val vel" id="d-spd">0.000</span>
+
+        <span class="kv-key">ax</span>
+        <span class="kv-val acc" id="d-ax">4.000</span>
+        <span class="kv-key">ay</span>
+        <span class="kv-val acc" id="d-ay">0.000</span>
+        <span class="kv-key">|a|</span>
+        <span class="kv-val acc" id="d-amag">4.000</span>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div>
+      <div class="panel-section-title">Legend</div>
+      <div class="legend" style="margin-top:10px;">
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#4e5a7a; border:1px dashed #6b7285;"></div>
+          <span>Trajectory curve</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--green);"></div>
+          <span>Velocity  v(t)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:var(--red);"></div>
+          <span>Acceleration  a(t)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="width:12px;height:12px;border-radius:50%;background:var(--particle);"></div>
+          <span>Particle position</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Equations (reference) -->
+    <div>
+      <div class="panel-section-title">Equations</div>
+      <div style="margin-top:10px; font-size:0.62rem; color:var(--text-dim); line-height:1.9;">
+        <div>r(t) = 2t²<b style="color:var(--text)">i</b> + 3t³<b style="color:var(--text)">j</b></div>
+        <div>v(t) = 4t<b style="color:var(--green)">i</b> + 9t²<b style="color:var(--green)">j</b></div>
+        <div>a(t) = 4<b style="color:var(--red)">i</b> + 18t<b style="color:var(--red)">j</b></div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- ╔══════════════════════════════════════╗
+     ║            CONTROLS BAR              ║
+     ╚══════════════════════════════════════╝ -->
+<div class="controls">
+
+  <!-- Play / Pause -->
+  <button id="btnPlay">▶ Play</button>
+
+  <!-- Time scrubber -->
+  <div class="slider-group">
+    <label for="tSlider">t =</label>
+    <input type="range" id="tSlider" min="-2" max="2" step="0.001" value="-2" />
+    <span id="tDisplay">−2.000</span>
+  </div>
+
+  <!-- Animation speed -->
+  <div class="speed-group">
+    <label for="speedSel">Speed</label>
+    <select id="speedSel">
+      <option value="0.3">0.3×</option>
+      <option value="0.6">0.6×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+      <option value="3">3×</option>
+    </select>
+  </div>
+
+</div>
+
+<!-- ╔══════════════════════════════════════╗
+     ║               SCRIPT                 ║
+     ╚══════════════════════════════════════╝ -->
+<script>
+  /* ──────────────────────────────────────────────────────────
+     CANVAS & CONTEXT SETUP
+  ────────────────────────────────────────────────────────── */
+  const cvs    = document.getElementById('cvs');
+  const ctx    = cvs.getContext('2d');
+  const W      = cvs.width;   // 700
+  const H      = cvs.height;  // 560
+
+  /* ── coordinate-system mapping ──────────────────────────
+     math domain: x ∈ [0, 8] (x=2t² at t=2 → 8), y ∈ [-24, 24]
+     origin placed at (originPx, originPy) in pixel space.
+     Scale: pixels per math unit.
+  ──────────────────────────────────────────────────────── */
+  const ORIGIN_PX = 90;           // px from left  (leaves room for negative x)
+  const ORIGIN_PY = H / 2;        // px from top   (centred vertically)
+  const SCALE     = 52;           // pixels per unit
+
+  /**
+   * Convert math coords → canvas pixel coords.
+   * @param {number} mx  — math x
+   * @param {number} my  — math y
+   */
+  function toCanvas(mx, my) {
+    return {
+      cx: ORIGIN_PX + mx * SCALE,
+      cy: ORIGIN_PY - my * SCALE   // canvas y is flipped
+    };
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     PARAMETRIC EQUATIONS
+  ────────────────────────────────────────────────────────── */
+  const pos   = t => ({ x: 2 * t * t,   y: 3 * t * t * t       });  // position
+  const vel   = t => ({ vx: 4 * t,      vy: 9 * t * t          });  // velocity
+  const accel = t => ({ ax: 4,          ay: 18 * t             });  // acceleration
+
+  /* ──────────────────────────────────────────────────────────
+     STATE
+  ────────────────────────────────────────────────────────── */
+  let t         = -2;
+  let playing   = false;
+  let lastTime  = null;   // for requestAnimationFrame delta
+  let speed     = 1;      // animation speed multiplier
+  let animId    = null;
+
+  /* ── DOM refs ── */
+  const slider   = document.getElementById('tSlider');
+  const tDisplay = document.getElementById('tDisplay');
+  const btnPlay  = document.getElementById('btnPlay');
+  const speedSel = document.getElementById('speedSel');
+
+  /* data panel cells */
+  const D = id => document.getElementById(id);
+
+  /* ──────────────────────────────────────────────────────────
+     DRAWING HELPERS
+  ────────────────────────────────────────────────────────── */
+
+  /**
+   * Draw an arrow from (px, py) in direction (dx, dy) in canvas space.
+   * @param {number} px, py   — tail position (canvas px)
+   * @param {number} dx, dy   — direction + length already in canvas px
+   * @param {string} color
+   * @param {number} lineW
+   */
+  function drawArrow(px, py, dx, dy, color, lineW = 2) {
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return;   // skip negligible arrows
+
+    const headLen = Math.min(14, len * 0.35);
+    const angle   = Math.atan2(dy, dx);
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle   = color;
+    ctx.lineWidth   = lineW;
+    ctx.lineCap     = 'round';
+
+    /* shaft */
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + dx, py + dy);
+    ctx.stroke();
+
+    /* arrowhead */
+    ctx.beginPath();
+    const tipX = px + dx;
+    const tipY = py + dy;
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - headLen * Math.cos(angle - Math.PI / 7),
+               tipY - headLen * Math.sin(angle - Math.PI / 7));
+    ctx.lineTo(tipX - headLen * Math.cos(angle + Math.PI / 7),
+               tipY - headLen * Math.sin(angle + Math.PI / 7));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /**
+   * Draw the coordinate axes with tick marks and numeric labels.
+   */
+  function drawAxes() {
+    ctx.save();
+    ctx.strokeStyle = '#2b3040';
+    ctx.fillStyle   = '#4a5168';
+    ctx.lineWidth   = 1;
+    ctx.font        = '10px IBM Plex Mono, monospace';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline= 'top';
+
+    /* X axis */
+    ctx.beginPath();
+    ctx.moveTo(20, ORIGIN_PY);
+    ctx.lineTo(W - 10, ORIGIN_PY);
+    ctx.stroke();
+
+    /* Y axis */
+    ctx.beginPath();
+    ctx.moveTo(ORIGIN_PX, 10);
+    ctx.lineTo(ORIGIN_PX, H - 10);
+    ctx.stroke();
+
+    /* X axis ticks & labels */
+    for (let xi = -1; xi <= 8; xi++) {
+      const { cx } = toCanvas(xi, 0);
+      if (cx < 10 || cx > W - 5) continue;
+      ctx.beginPath();
+      ctx.moveTo(cx, ORIGIN_PY - 4);
+      ctx.lineTo(cx, ORIGIN_PY + 4);
+      ctx.strokeStyle = '#2b3040';
+      ctx.stroke();
+      if (xi !== 0) {
+        ctx.fillText(xi, cx, ORIGIN_PY + 7);
+      }
+    }
+
+    /* Y axis ticks & labels */
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let yi = -24; yi <= 24; yi += 4) {
+      const { cy } = toCanvas(0, yi);
+      if (cy < 10 || cy > H - 10) continue;
+      ctx.beginPath();
+      ctx.moveTo(ORIGIN_PX - 4, cy);
+      ctx.lineTo(ORIGIN_PX + 4, cy);
+      ctx.strokeStyle = '#2b3040';
+      ctx.stroke();
+      if (yi !== 0) {
+        ctx.fillText(yi, ORIGIN_PX - 7, cy);
+      }
+    }
+
+    /* subtle grid */
+    ctx.strokeStyle = '#161b26';
+    ctx.lineWidth   = 0.5;
+    for (let xi = 0; xi <= 8; xi++) {
+      const { cx } = toCanvas(xi, 0);
+      ctx.beginPath(); ctx.moveTo(cx, 10); ctx.lineTo(cx, H - 10); ctx.stroke();
+    }
+    for (let yi = -24; yi <= 24; yi += 4) {
+      const { cy } = toCanvas(0, yi);
+      ctx.beginPath(); ctx.moveTo(20, cy); ctx.lineTo(W - 10, cy); ctx.stroke();
+    }
+
+    /* axis labels */
+    ctx.fillStyle   = '#4a5168';
+    ctx.font        = '11px IBM Plex Mono, monospace';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline= 'top';
+    ctx.fillText('x', W - 18, ORIGIN_PY + 8);
+    ctx.textAlign   = 'left';
+    ctx.textBaseline= 'top';
+    ctx.fillText('y', ORIGIN_PX + 7, 12);
+
+    ctx.restore();
+  }
+
+  /**
+   * Draw the trajectory (semicubical parabola) as a pre-rendered static path.
+   */
+  function drawCurve() {
+    const steps = 400;
+    const tMin  = -2, tMax = 2;
+
+    ctx.save();
+    ctx.strokeStyle = '#3a4460';
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = 0;
+    ctx.lineJoin = 'round';
+    ctx.lineCap  = 'round';
+
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const ti = tMin + (tMax - tMin) * (i / steps);
+      const { x, y } = pos(ti);
+      const { cx, cy } = toCanvas(x, y);
+      if (i === 0) ctx.moveTo(cx, cy);
+      else         ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    /* highlight cusp at origin */
+    const { cx: ox, cy: oy } = toCanvas(0, 0);
+    ctx.save();
+    ctx.fillStyle   = '#5a6482';
+    ctx.strokeStyle = '#3a4460';
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.arc(ox, oy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Draw the particle and its velocity / acceleration vectors.
+   * @param {number} t  — current time
+   */
+  function drawParticle(t) {
+    const { x, y }    = pos(t);
+    const { vx, vy }  = vel(t);
+    const { ax, ay }  = accel(t);
+    const { cx, cy }  = toCanvas(x, y);
+
+    /* ── vector scaling factors ────────────────────────────
+       We convert math-unit vectors → canvas-pixel vectors,
+       then apply a visual scale so they fit on screen.
+    ──────────────────────────────────────────────────────── */
+    const VEL_SCALE   = 0.9;   // visual damping of velocity arrow
+    const ACCEL_SCALE = 2.8;   // visual amplification for acceleration
+
+    /* Velocity arrow (green) */
+    const vdx = vx * SCALE * VEL_SCALE;
+    const vdy = -vy * SCALE * VEL_SCALE;   // minus because canvas y is flipped
+    drawArrow(cx, cy, vdx, vdy, '#4ade80', 2.5);
+
+    /* Acceleration arrow (red) */
+    const adx = ax * SCALE * ACCEL_SCALE;
+    const ady = -ay * SCALE * ACCEL_SCALE;
+    drawArrow(cx, cy, adx, ady, '#f87171', 2.5);
+
+    /* ── Particle dot ── */
+    /* outer glow */
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 14);
+    grd.addColorStop(0, 'rgba(240,192,96,0.35)');
+    grd.addColorStop(1, 'rgba(240,192,96,0)');
+    ctx.save();
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    /* core dot */
+    ctx.save();
+    ctx.fillStyle   = '#f0c060';
+    ctx.strokeStyle = '#0b0d11';
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     FULL RENDER FRAME
+  ────────────────────────────────────────────────────────── */
+  function render() {
+    /* clear */
+    ctx.clearRect(0, 0, W, H);
+
+    /* background fill */
+    ctx.fillStyle = '#13161d';
+    ctx.fillRect(0, 0, W, H);
+
+    drawAxes();
+    drawCurve();
+    drawParticle(t);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     DATA PANEL UPDATE
+  ────────────────────────────────────────────────────────── */
+  function updatePanel() {
+    const { x, y }    = pos(t);
+    const { vx, vy }  = vel(t);
+    const { ax, ay }  = accel(t);
+    const speed_mag   = Math.hypot(vx, vy);
+    const accel_mag   = Math.hypot(ax, ay);
+
+    const fmt = (n, d = 3) => n.toFixed(d);
+
+    D('d-t').textContent   = fmt(t);
+    D('d-x').textContent   = fmt(x);
+    D('d-y').textContent   = fmt(y);
+    D('d-vx').textContent  = fmt(vx);
+    D('d-vy').textContent  = fmt(vy);
+    D('d-spd').textContent = fmt(speed_mag);
+    D('d-ax').textContent  = fmt(ax);
+    D('d-ay').textContent  = fmt(ay);
+    D('d-amag').textContent= fmt(accel_mag);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     ANIMATION LOOP
+  ────────────────────────────────────────────────────────── */
+  const T_RANGE = 4;   // total range: from -2 to 2
+
+  function animate(timestamp) {
+    if (!playing) return;
+
+    if (lastTime === null) lastTime = timestamp;
+    const dt = (timestamp - lastTime) / 1000;   // seconds elapsed
+    lastTime = timestamp;
+
+    /* advance t by dt * speed (full loop takes T_RANGE/speed seconds) */
+    t += dt * speed;
+    if (t > 2) {
+      t = -2;   // loop back to start
+    }
+
+    /* sync slider */
+    slider.value = t;
+    tDisplay.textContent = t.toFixed(3);
+
+    render();
+    updatePanel();
+
+    animId = requestAnimationFrame(animate);
+  }
+
+  /* ──────────────────────────────────────────────────────────
+     EVENT LISTENERS
+  ────────────────────────────────────────────────────────── */
+
+  /* Play / Pause toggle */
+  btnPlay.addEventListener('click', () => {
+    playing = !playing;
+    lastTime = null;   // reset delta timer
+    if (playing) {
+      btnPlay.textContent = '⏸ Pause';
+      btnPlay.classList.add('playing');
+      animId = requestAnimationFrame(animate);
+    } else {
+      btnPlay.textContent = '▶ Play';
+      btnPlay.classList.remove('playing');
+      if (animId) cancelAnimationFrame(animId);
+    }
+  });
+
+  /* Manual slider scrub — stops autoplay while dragging */
+  slider.addEventListener('input', () => {
+    t = parseFloat(slider.value);
+    tDisplay.textContent = t.toFixed(3);
+    render();
+    updatePanel();
+  });
+
+  /* Speed selector */
+  speedSel.addEventListener('change', () => {
+    speed = parseFloat(speedSel.value);
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     INITIAL RENDER
+  ────────────────────────────────────────────────────────── */
+  render();
+  updatePanel();
+</script>
+</body>
+</html>
