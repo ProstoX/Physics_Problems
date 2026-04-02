@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Simple Pendulum — Gravitational Dependence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0c0e14;
+    --surface:    #13161f;
+    --panel:      #1a1e2a;
+    --border:     #2a2f40;
+    --accent:     #c9a84c;
+    --accent2:    #e8c96a;
+    --dim:        #5a6070;
+    --text:       #d8dde8;
+    --text-soft:  #8a909e;
+    --bob:        #c9a84c;
+    --bob-shine:  #ffe8a0;
+    --string:     #8a7a5a;
+    --pivot:      #a89060;
+    --glow:       rgba(201,168,76,0.18);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+  }
+
+  /* ── HEADER ─────────────────────────────── */
+  header {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  header .label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 400;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+  header h1 em {
+    font-style: italic;
+    color: var(--accent2);
+  }
+  header .subtitle {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-soft);
+    letter-spacing: 1px;
+  }
+
+  /* ── MAIN LAYOUT ─────────────────────────── */
+  .layout {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 960px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ── CANVAS CARD ─────────────────────────── */
+  .canvas-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .canvas-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 50% 10%, var(--glow), transparent 70%);
+    pointer-events: none;
+  }
+  canvas {
+    display: block;
+  }
+
+  /* ── SIDE PANEL ──────────────────────────── */
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 240px;
+    flex: 1;
+  }
+
+  /* ── PANEL CARD ──────────────────────────── */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 22px;
+  }
+  .card-title {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── ENVIRONMENT SELECTOR ────────────────── */
+  .env-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .env-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 9px 12px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    transition: border-color .2s, background .2s;
+  }
+  .env-option:hover { background: rgba(201,168,76,0.06); }
+  .env-option.active {
+    border-color: var(--accent);
+    background: rgba(201,168,76,0.1);
+  }
+  .env-option input[type="radio"] { display: none; }
+  .radio-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--dim);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: border-color .2s;
+  }
+  .env-option.active .radio-dot { border-color: var(--accent); }
+  .radio-dot::after {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .env-option.active .radio-dot::after { opacity: 1; }
+  .env-label { font-size: 12px; color: var(--text); }
+  .env-sub   { font-size: 10px; color: var(--text-soft); margin-top: 1px; }
+
+  /* ── SLIDER ──────────────────────────────── */
+  .slider-group { display: flex; flex-direction: column; gap: 10px; }
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .slider-label { font-size: 12px; color: var(--text); }
+  .slider-val {
+    font-size: 13px;
+    color: var(--accent2);
+    font-weight: 500;
+    min-width: 48px;
+    text-align: right;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 8px var(--glow);
+    cursor: pointer;
+    transition: transform .15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    cursor: pointer;
+  }
+
+  /* ── READOUTS ────────────────────────────── */
+  .readouts { display: flex; flex-direction: column; gap: 12px; }
+  .readout {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .readout:last-child { border-bottom: none; padding-bottom: 0; }
+  .readout-name { font-size: 10px; color: var(--text-soft); letter-spacing: 1px; }
+  .readout-value {
+    font-size: 18px;
+    color: var(--accent2);
+    letter-spacing: 1px;
+    font-weight: 500;
+  }
+  .readout-value .unit { font-size: 11px; color: var(--dim); margin-left: 3px; }
+
+  /* ── PERIOD HIGHLIGHT ────────────────────── */
+  .period-card {
+    background: linear-gradient(135deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.04) 100%);
+    border: 1px solid rgba(201,168,76,0.35);
+    border-radius: 4px;
+    padding: 20px 22px;
+    text-align: center;
+  }
+  .period-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .period-formula {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text-soft);
+    margin-bottom: 14px;
+  }
+  .period-value {
+    font-size: 44px;
+    color: var(--accent2);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -1px;
+    transition: color .25s;
+  }
+  .period-unit {
+    font-size: 14px;
+    color: var(--dim);
+    margin-top: 4px;
+  }
+
+  /* ── RESET BUTTON ────────────────────────── */
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 9px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+  .btn-reset:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(201,168,76,0.06);
+  }
+
+  /* ── FOOTER ──────────────────────────────── */
+  footer {
+    margin-top: 36px;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="label">Physics Simulation</div>
+  <h1>Simple <em>Pendulum</em></h1>
+  <div class="subtitle">Gravitational Dependence &amp; Period Analysis</div>
+</header>
+
+<div class="layout">
+
+  <!-- Canvas -->
+  <div class="canvas-card">
+    <canvas id="pendulumCanvas" width="420" height="460"></canvas>
+  </div>
+
+  <!-- Controls -->
+  <div class="side">
+
+    <!-- Environment -->
+    <div class="card">
+      <div class="card-title">Environment</div>
+      <div class="env-group" id="envGroup">
+        <label class="env-option active" id="opt-earth">
+          <input type="radio" name="env" value="earth" checked>
+          <div class="radio-dot"></div>
+          <div>
+            <div class="env-label">Earth</div>
+            <div class="env-sub">g = 9.81 m/s²</div>
+          </div>
+        </label>
+        <label class="env-option" id="opt-moon">
+          <input type="radio" name="env" value="moon">
+          <div class="radio-dot"></div>
+          <div>
+            <div class="env-label">Moon</div>
+            <div class="env-sub">g = 1.635 m/s²</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Length slider -->
+    <div class="card">
+      <div class="card-title">Parameters</div>
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-label">Pendulum Length (L)</span>
+          <span class="slider-val" id="lengthDisplay">1.00 m</span>
+        </div>
+        <input type="range" id="lengthSlider" min="0.1" max="2.0" step="0.01" value="1.0">
+      </div>
+    </div>
+
+    <!-- Period highlight -->
+    <div class="period-card">
+      <div class="period-label">Calculated Period</div>
+      <div class="period-formula">T = 2π √(L / g)</div>
+      <div class="period-value" id="periodValue">2.007</div>
+      <div class="period-unit">seconds per oscillation</div>
+    </div>
+
+    <!-- Live readouts -->
+    <div class="card">
+      <div class="card-title">Live Telemetry</div>
+      <div class="readouts">
+        <div class="readout">
+          <span class="readout-name">GRAVITY (g)</span>
+          <span class="readout-value" id="readG">9.81<span class="unit">m/s²</span></span>
+        </div>
+        <div class="readout">
+          <span class="readout-name">LENGTH (L)</span>
+          <span class="readout-value" id="readL">1.00<span class="unit">m</span></span>
+        </div>
+        <div class="readout">
+          <span class="readout-name">ANGLE (θ)</span>
+          <span class="readout-value" id="readAngle">30.0<span class="unit">°</span></span>
+        </div>
+        <div class="readout">
+          <span class="readout-name">ANG. VELOCITY</span>
+          <span class="readout-value" id="readOmega">0.00<span class="unit">rad/s</span></span>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-reset" id="resetBtn">↺ &nbsp; Reset Pendulum</button>
+  </div>
+</div>
+
+<footer>angular_acceleration = −(g / L) · sin(θ) &nbsp;·&nbsp; runge-kutta integration</footer>
+
+<script>
+(() => {
+  // ── Physics state ──────────────────────────
+  const ENVS = {
+    earth: 9.81,
+    moon:  1.635
+  };
+  const INITIAL_ANGLE = Math.PI / 6; // 30°
+  let g = ENVS.earth;
+  let L = 1.0;
+  let angle = INITIAL_ANGLE;
+  let omega = 0;            // angular velocity rad/s
+  let lastTime = null;
+
+  // ── Canvas setup ──────────────────────────
+  const canvas = document.getElementById('pendulumCanvas');
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // Fixed pivot position
+  const pivotX = W / 2;
+  const pivotY = 56;
+
+  // Scale: pixels per metre
+  const SCALE = () => Math.min(W, H - pivotY - 40) / 2.1;
+
+  // ── RK4 integration ───────────────────────
+  function derivatives(th, om) {
+    const dth = om;
+    const dom = -(g / L) * Math.sin(th);
+    return { dth, dom };
+  }
+
+  function rk4Step(th, om, dt) {
+    const k1 = derivatives(th,              om);
+    const k2 = derivatives(th + .5*dt*k1.dth, om + .5*dt*k1.dom);
+    const k3 = derivatives(th + .5*dt*k2.dth, om + .5*dt*k2.dom);
+    const k4 = derivatives(th +    dt*k3.dth, om +    dt*k3.dom);
+    return {
+      th: th + (dt/6)*(k1.dth + 2*k2.dth + 2*k3.dth + k4.dth),
+      om: om + (dt/6)*(k1.dom + 2*k2.dom + 2*k3.dom + k4.dom)
+    };
+  }
+
+  // ── Drawing ───────────────────────────────
+  function drawScene() {
+    ctx.clearRect(0, 0, W, H);
+
+    const s = SCALE();
+    const ropeLen = L * s;
+    const bobR    = Math.max(12, Math.min(22, 12 + L * 5));
+
+    const bobX = pivotX + ropeLen * Math.sin(angle);
+    const bobY = pivotY + ropeLen * Math.cos(angle);
+
+    // ── Trajectory ghost arc ──
+    ctx.save();
+    const arcR = ropeLen;
+    const maxAmp = Math.abs(INITIAL_ANGLE) + 0.02;
+    ctx.beginPath();
+    ctx.arc(pivotX, pivotY, arcR,
+      Math.PI/2 - maxAmp,
+      Math.PI/2 + maxAmp);
+    ctx.strokeStyle = 'rgba(201,168,76,0.07)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Ceiling mount decoration ──
+    ctx.save();
+    const mountW = 48;
+    const gradient = ctx.createLinearGradient(pivotX - mountW/2, 0, pivotX + mountW/2, 0);
+    gradient.addColorStop(0, 'transparent');
+    gradient.addColorStop(0.5, '#3a3020');
+    gradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(pivotX - mountW/2, 0, mountW, pivotY - 6);
+    ctx.restore();
+
+    // ── Angle guide line (faint vertical) ──
+    ctx.save();
+    ctx.setLineDash([4, 6]);
+    ctx.strokeStyle = 'rgba(90,96,112,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pivotX, pivotY);
+    ctx.lineTo(pivotX, pivotY + ropeLen + bobR + 6);
+    ctx.stroke();
+    ctx.restore();
+
+    // ── String ──
+    ctx.save();
+    const stringGrad = ctx.createLinearGradient(pivotX, pivotY, bobX, bobY);
+    stringGrad.addColorStop(0, '#6a5f40');
+    stringGrad.addColorStop(1, '#4a4030');
+    ctx.strokeStyle = stringGrad;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pivotX, pivotY);
+    ctx.lineTo(bobX, bobY);
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Pivot ──
+    ctx.save();
+    const pivotGrad = ctx.createRadialGradient(pivotX - 2, pivotY - 2, 1, pivotX, pivotY, 9);
+    pivotGrad.addColorStop(0, '#e8d070');
+    pivotGrad.addColorStop(1, '#6a5020');
+    ctx.fillStyle = pivotGrad;
+    ctx.beginPath();
+    ctx.arc(pivotX, pivotY, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2a2010';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Bob shadow ──
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(bobX + 4, bobY + 4, bobR, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.filter = 'blur(6px)';
+    ctx.fill();
+    ctx.restore();
+
+    // ── Bob body ──
+    ctx.save();
+    const bobGrad = ctx.createRadialGradient(
+      bobX - bobR*0.3, bobY - bobR*0.3, bobR*0.05,
+      bobX, bobY, bobR
+    );
+    bobGrad.addColorStop(0.0, '#fff5c8');
+    bobGrad.addColorStop(0.3, '#e8c060');
+    bobGrad.addColorStop(0.7, '#b08028');
+    bobGrad.addColorStop(1.0, '#6a4810');
+    ctx.beginPath();
+    ctx.arc(bobX, bobY, bobR, 0, Math.PI * 2);
+    ctx.fillStyle = bobGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#4a3010';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Bob specular ──
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(bobX - bobR*0.28, bobY - bobR*0.28, bobR*0.22, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,220,0.55)';
+    ctx.fill();
+    ctx.restore();
+
+    // ── Angle arc indicator ──
+    if (Math.abs(angle) > 0.015) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(pivotX, pivotY, 36,
+        Math.PI/2 - Math.abs(angle), Math.PI/2,
+        angle > 0);
+      ctx.strokeStyle = `rgba(201,168,76,${Math.min(0.6, Math.abs(angle) * 2)})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ── Period formula ────────────────────────
+  function calcPeriod() {
+    return 2 * Math.PI * Math.sqrt(L / g);
+  }
+
+  function updateUI() {
+    const T = calcPeriod();
+    document.getElementById('periodValue').textContent = T.toFixed(3);
+    document.getElementById('readG').innerHTML     = g.toFixed(3) + '<span class="unit">m/s²</span>';
+    document.getElementById('readL').innerHTML     = L.toFixed(2)  + '<span class="unit">m</span>';
+    document.getElementById('readAngle').innerHTML = (angle * 180 / Math.PI).toFixed(1) + '<span class="unit">°</span>';
+    document.getElementById('readOmega').innerHTML = omega.toFixed(3) + '<span class="unit">rad/s</span>';
+    document.getElementById('lengthDisplay').textContent = L.toFixed(2) + ' m';
+  }
+
+  // ── Animation loop ─────────────────────────
+  function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const rawDt = Math.min((timestamp - lastTime) / 1000, 0.05); // cap for tab focus
+    lastTime = timestamp;
+
+    // Sub-step for accuracy
+    const steps = 8;
+    const dt = rawDt / steps;
+    for (let i = 0; i < steps; i++) {
+      const next = rk4Step(angle, omega, dt);
+      angle = next.th;
+      omega = next.om;
+    }
+
+    drawScene();
+    updateUI();
+    requestAnimationFrame(loop);
+  }
+
+  // ── Controls ──────────────────────────────
+  document.querySelectorAll('input[name="env"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      g = ENVS[radio.value];
+      // update active styling
+      document.querySelectorAll('.env-option').forEach(el => el.classList.remove('active'));
+      radio.closest('.env-option').classList.add('active');
+      updateUI();
+    });
+  });
+  // Allow clicking the whole label
+  document.querySelectorAll('.env-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const radio = opt.querySelector('input[type="radio"]');
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change'));
+    });
+  });
+
+  const lengthSlider = document.getElementById('lengthSlider');
+  lengthSlider.addEventListener('input', () => {
+    L = parseFloat(lengthSlider.value);
+    updateUI();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    angle = INITIAL_ANGLE;
+    omega = 0;
+    lastTime = null;
+  });
+
+  // ── Start ─────────────────────────────────
+  updateUI();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

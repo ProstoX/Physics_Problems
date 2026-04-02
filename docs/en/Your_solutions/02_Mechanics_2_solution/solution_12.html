@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Trajectory Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        /* CSS to ensure full-screen responsive layout */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        #plot-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        /* Styling for an overlay information panel */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to the graph */
+            border: 1px solid #ddd;
+        }
+        .info-panel h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #333;
+        }
+        .info-panel p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #555;
+            line-height: 1.4;
+        }
+        .math-text {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #eee;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-panel">
+        <h3>Trajectory Parameters</h3>
+        <p><strong>x(t)</strong> = <span class="math-text">1.5t² + t</span></p>
+        <p><strong>y(t)</strong> = <span class="math-text">0.5t² - t</span></p>
+        <p><strong>Time:</strong> t = 0 to 3s</p>
+        <p><strong>Force:</strong> F = [6, 2]</p>
+    </div>
+
+    <div id="plot-container"></div>
+
+    <script>
+        // 1. Generate the trajectory data
+        const t_max = 3;
+        const steps = 100; // Resolution of the curve
+        const dt = t_max / steps;
+
+        let x_vals = [];
+        let y_vals = [];
+
+        for (let i = 0; i <= steps; i++) {
+            let t = i * dt;
+            let x = 1.5 * Math.pow(t, 2) + t;
+            let y = 0.5 * Math.pow(t, 2) - t;
+            x_vals.push(x);
+            y_vals.push(y);
+        }
+
+        // 2. Define Traces
+        // Trace for the continuous path
+        const tracePath = {
+            x: x_vals,
+            y: y_vals,
+            mode: 'lines',
+            name: 'Trajectory Path',
+            line: {
+                color: '#1f77b4',
+                width: 3
+            },
+            hovertemplate: 'x: %{x:.2f} m<br>y: %{y:.2f} m<extra></extra>'
+        };
+
+        // Trace for the starting point at t=0
+        const traceStart = {
+            x: [0],
+            y: [0],
+            mode: 'markers',
+            name: 'Start (t=0)',
+            marker: {
+                color: '#2ca02c',
+                size: 12,
+                symbol: 'circle',
+                line: { color: 'white', width: 2 }
+            },
+            hovertemplate: 'Start Position<br>x: %{x} m<br>y: %{y} m<extra></extra>'
+        };
+
+        // Trace for the final point at t=3
+        const traceEnd = {
+            x: [16.5],
+            y: [1.5],
+            mode: 'markers',
+            name: 'End (t=3)',
+            marker: {
+                color: '#d62728',
+                size: 12,
+                symbol: 'circle',
+                line: { color: 'white', width: 2 }
+            },
+            hovertemplate: 'End Position<br>x: %{x} m<br>y: %{y} m<extra></extra>'
+        };
+
+        const data = [tracePath, traceStart, traceEnd];
+
+        // 3. Define Layout and Vectors
+        const layout = {
+            title: '2D Kinematics: Object Trajectory over 3 Seconds',
+            xaxis: {
+                title: '<b>x (meters)</b>',
+                zeroline: true,
+                zerolinewidth: 2,
+                zerolinecolor: '#999',
+                gridcolor: '#e5e5e5'
+            },
+            yaxis: {
+                title: '<b>y (meters)</b>',
+                zeroline: true,
+                zerolinewidth: 2,
+                zerolinecolor: '#999',
+                gridcolor: '#e5e5e5',
+                // IMPORTANT: scaleanchor maintains a 1:1 aspect ratio so the vector 
+                // direction matches real math geometry visually.
+                scaleanchor: 'x', 
+                scaleratio: 1
+            },
+            // Draw the Force Vector F = [6, 2] starting from the end point
+            annotations: [
+                {
+                    // Head of the arrow (Current Position + Vector magnitude)
+                    x: 16.5 + 6, 
+                    y: 1.5 + 2,  
+                    // Tail of the arrow (Current Position)
+                    ax: 16.5,    
+                    ay: 1.5,     
+                    xref: 'x',
+                    yref: 'y',
+                    axref: 'x',
+                    ayref: 'y',
+                    showarrow: true,
+                    arrowhead: 2,
+                    arrowsize: 1.5,
+                    arrowwidth: 3,
+                    arrowcolor: '#ff7f0e',
+                    text: '<b>Force F = [6, 2]</b>',
+                    font: { size: 14, color: '#ff7f0e' },
+                    xanchor: 'left',
+                    yanchor: 'bottom'
+                }
+            ],
+            hovermode: 'closest',
+            plot_bgcolor: 'white',
+            paper_bgcolor: '#f8f9fa',
+            legend: {
+                x: 0.02,
+                y: 0.02,
+                bgcolor: 'rgba(255, 255, 255, 0.8)',
+                bordercolor: '#ddd',
+                borderwidth: 1
+            }
+        };
+
+        // Configuration for responsive resizing
+        const config = {
+            responsive: true,
+            displayModeBar: false // Hides the top-right tool menu for a cleaner look
+        };
+
+        // 4. Render the plot
+        Plotly.newPlot('plot-container', data, layout, config);
+    </script>
+</body>
+</html>

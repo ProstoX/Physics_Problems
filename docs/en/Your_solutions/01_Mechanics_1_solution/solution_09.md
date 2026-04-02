@@ -1,3 +1,7 @@
+## 9. Momentum Comparison
+
+Which has greater momentum: a 2-gram fly flying at $10$ m/s or a 60-gram tennis ball moving at $1$ m/s?
+
 ### Variables and Units Glossary
 
 Before we calculate the solution, here is a breakdown of the mathematical symbols used in this problem and their standard SI units:

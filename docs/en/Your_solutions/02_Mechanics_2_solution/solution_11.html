@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Particle Trajectory</title>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        #plot-container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* UI Controls Styling */
+        #controls-container {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 30, 0.85);
+            padding: 15px 30px;
+            border-radius: 12px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid #333;
+        }
+
+        button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        button:hover { background-color: #005a9e; }
+        button:active { background-color: #004578; }
+
+        #time-display {
+            font-size: 18px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            width: 100px;
+            text-align: right;
+            color: #00d2ff;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="plot-container"></div>
+
+    <div id="controls-container">
+        <button id="btn-play">Play</button>
+        <button id="btn-pause">Pause</button>
+        <button id="btn-reset">Reset</button>
+        <div id="time-display">t = 0.00 s</div>
+    </div>
+
+    <script>
+        // 1. Define the parametric equations based on time 't'
+        function x(t) { return (5/6) * Math.pow(t, 3) + 2 * t + 5; }
+        function y(t) { return (1/6) * Math.pow(t, 3) - 2 * Math.pow(t, 2) + 2; }
+        function z(t) { return -(1/6) * Math.pow(t, 4) + t - 3; }
+
+        // 2. Generate the static path data from t = 0 to t = 4
+        const tMax = 4;
+        const numPoints = 250; 
+        const pathX = [], pathY = [], pathZ = [];
+
+        for (let i = 0; i <= numPoints; i++) {
+            const t = (i / numPoints) * tMax;
+            pathX.push(x(t));
+            pathY.push(y(t));
+            pathZ.push(z(t));
+        }
+
+        // 3. Define Plotly Traces
+        const tracePath = {
+            type: 'scatter3d',
+            mode: 'lines',
+            x: pathX,
+            y: pathY,
+            z: pathZ,
+            line: { width: 5, color: '#00d2ff' },
+            name: 'Trajectory Path',
+            hoverinfo: 'none' 
+        };
+
+        const traceParticle = {
+            type: 'scatter3d',
+            mode: 'markers',
+            x: [x(0)],
+            y: [y(0)],
+            z: [z(0)],
+            marker: { size: 10, color: '#ffaa00', symbol: 'circle' },
+            name: 'Particle (t)',
+            hovertemplate: 'X: %{x:.2f}<br>Y: %{y:.2f}<br>Z: %{z:.2f}<extra></extra>'
+        };
+
+        // 4. Define Layout and 3D Scene
+        const layout = {
+            title: { text: '3D Particle Trajectory: t ∈ [0, 4]', font: { color: '#ffffff', size: 24 } },
+            paper_bgcolor: '#121212',
+            plot_bgcolor: '#121212',
+            font: { color: '#aaaaaa' },
+            margin: { l: 0, r: 0, b: 0, t: 70 },
+            showlegend: true,
+            legend: { x: 0.05, y: 0.95, bgcolor: 'rgba(0,0,0,0)' },
+            scene: {
+                xaxis: { title: 'X Axis', range: [0, 70], gridcolor: '#333', zerolinecolor: '#555' },
+                yaxis: { title: 'Y Axis', range: [-25, 5], gridcolor: '#333', zerolinecolor: '#555' },
+                zaxis: { title: 'Z Axis', range: [-45, 5], gridcolor: '#333', zerolinecolor: '#555' },
+                camera: { eye: { x: 1.6, y: -1.6, z: 1.0 } }, 
+                aspectratio: { x: 1, y: 1, z: 1 }
+            }
+        };
+
+        // Render the initial plot
+        Plotly.newPlot('plot-container', [tracePath, traceParticle], layout);
+
+        // 5. Animation Logic
+        let isPlaying = false;
+        let currentTime = 0;
+        let lastTimestamp = null;
+        let animationRequest = null;
+        const timeDisplay = document.getElementById('time-display');
+
+        // FIXED: Using Plotly.restyle instead of Plotly.animate
+        function updateMarker(t) {
+            // Note the double arrays: [[value]]. 
+            // The outer array maps to the trace index, inner is the data itself.
+            Plotly.restyle('plot-container', {
+                x: [[x(t)]],
+                y: [[y(t)]],
+                z: [[z(t)]]
+            }, [1]); // [1] explicitly targets the second trace (the particle)
+            
+            timeDisplay.textContent = `t = ${t.toFixed(2)} s`;
+        }
+
+        // Core animation loop
+        function animateLoop(timestamp) {
+            if (!isPlaying) return;
+
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const deltaT = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            currentTime += (deltaT / 1000);
+
+            if (currentTime >= tMax) {
+                currentTime = tMax;
+                isPlaying = false;
+                updateMarker(currentTime);
+                return;
+            }
+
+            updateMarker(currentTime);
+            animationRequest = requestAnimationFrame(animateLoop);
+        }
+
+        // 6. Bind UI Controls
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (!isPlaying) {
+                if (currentTime >= tMax) {
+                    currentTime = 0;
+                }
+                isPlaying = true;
+                lastTimestamp = null; 
+                animationRequest = requestAnimationFrame(animateLoop);
+            }
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            isPlaying = false;
+            if (animationRequest) {
+                cancelAnimationFrame(animationRequest);
+            }
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            isPlaying = false;
+            if (animationRequest) {
+                cancelAnimationFrame(animationRequest);
+            }
+            currentTime = 0;
+            updateMarker(currentTime);
+            
+            Plotly.relayout('plot-container', {
+                'scene.camera': layout.scene.camera
+            });
+        });
+
+    </script>
+</body>
+</html>

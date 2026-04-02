@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanical Energy Dissipation</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --panel-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+            --canvas-bg: #e9ecef;
+            --floor-color: #495057;
+            --ball-color: #ccff00; /* Tennis ball yellow/green */
+            --border-radius: 12px;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .canvas-section, .controls-section {
+            background-color: var(--panel-bg);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .canvas-section {
+            flex: 1 1 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: var(--canvas-bg);
+            border-radius: 8px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 100%;
+        }
+
+        .controls-section {
+            flex: 1 1 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        h2, h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #btnDrop {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        #btnDrop:hover {
+            background-color: var(--accent-hover);
+        }
+
+        #btnPause {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        #btnPause:hover {
+            background-color: #e0a800;
+        }
+
+        #btnReset {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        #btnReset:hover {
+            background-color: #c82333;
+        }
+
+        .dashboard {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .dashboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 1.1rem;
+        }
+
+        .dashboard-item:last-child {
+            border-bottom: none;
+        }
+
+        .dashboard-value {
+            font-family: monospace;
+            font-weight: bold;
+            color: var(--accent-color);
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="canvas-section">
+        <h2>Simulation</h2>
+        <canvas id="simCanvas" width="400" height="600"></canvas>
+    </div>
+
+    <div class="controls-section">
+        <div>
+            <h2>Initial Parameters</h2>
+            <div class="control-group">
+                <label for="heightSlider">Drop Height: <span id="heightDisplay">2.0 m</span></label>
+                <input type="range" id="heightSlider" min="1.0" max="5.0" step="0.1" value="2.0">
+            </div>
+            <br>
+            <div class="control-group">
+                <label for="lossSlider">Energy Loss per Bounce: <span id="lossDisplay">30%</span></label>
+                <input type="range" id="lossSlider" min="0" max="90" step="1" value="30">
+            </div>
+
+            <div class="button-group">
+                <button id="btnDrop">Drop</button>
+                <button id="btnPause">Pause</button>
+                <button id="btnReset">Reset</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <h3>Live Data Dashboard</h3>
+            <div class="dashboard-item">
+                <span>Bounce Count:</span>
+                <span class="dashboard-value" id="dashBounces">0</span>
+            </div>
+            <div class="dashboard-item">
+                <span>Peak Height (m):</span>
+                <span class="dashboard-value" id="dashHeight">2.00</span>
+            </div>
+            <div class="dashboard-item" style="font-size: 0.85rem; color: #6c757d;">
+                <span>Math: h_new = h_old * (1 - loss)</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Constants & Configuration
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const PIXELS_PER_METER = 100; // Scale factor
+    const FLOOR_Y = 550; // Floor position on canvas
+    const GRAVITY = 9.81; // m/s^2
+    const BALL_RADIUS = 12;
+
+    // Simulation State Variables
+    let ball = { y: 0, v: 0 }; // y in pixels, v in m/s
+    let state = 'idle'; // 'idle', 'running', 'paused'
+    let bounces = 0;
+    let currentPeak = 0; // in meters
+    let peakHeights = []; // history of peaks in meters
+    let lastTime = 0;
+    let animationId = null;
+
+    // DOM Elements
+    const heightSlider = document.getElementById('heightSlider');
+    const lossSlider = document.getElementById('lossSlider');
+    const heightDisplay = document.getElementById('heightDisplay');
+    const lossDisplay = document.getElementById('lossDisplay');
+    const dashBounces = document.getElementById('dashBounces');
+    const dashHeight = document.getElementById('dashHeight');
+
+    // UI Event Listeners
+    heightSlider.addEventListener('input', (e) => {
+        heightDisplay.innerText = `${parseFloat(e.target.value).toFixed(1)} m`;
+        if (state === 'idle') resetSimulation();
+    });
+
+    lossSlider.addEventListener('input', (e) => {
+        lossDisplay.innerText = `${e.target.value}%`;
+    });
+
+    document.getElementById('btnDrop').addEventListener('click', () => {
+        if (state === 'idle') {
+            state = 'running';
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        } else if (state === 'paused') {
+            state = 'running';
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+    });
+
+    document.getElementById('btnPause').addEventListener('click', () => {
+        if (state === 'running') state = 'paused';
+    });
+
+    document.getElementById('btnReset').addEventListener('click', resetSimulation);
+
+    // Initialization / Reset Logic
+    function resetSimulation() {
+        state = 'idle';
+        cancelAnimationFrame(animationId);
+        
+        let initialHeight = parseFloat(heightSlider.value);
+        ball.y = FLOOR_Y - (initialHeight * PIXELS_PER_METER);
+        ball.v = 0;
+        
+        bounces = 0;
+        currentPeak = initialHeight;
+        peakHeights = [initialHeight];
+        
+        updateDashboard();
+        draw();
+    }
+
+    function updateDashboard() {
+        dashBounces.innerText = bounces;
+        dashHeight.innerText = currentPeak.toFixed(2);
+    }
+
+    // Main Loop
+    function gameLoop(timestamp) {
+        if (state !== 'running') return;
+
+        // Fixed timestep physics for stable integration
+        // Capping deltaTime to prevent huge jumps if tab was inactive
+        let dt = (timestamp - lastTime) / 1000;
+        if (dt > 0.05) dt = 0.016; 
+        lastTime = timestamp;
+
+        updatePhysics(dt);
+        draw();
+
+        if (state === 'running') {
+            animationId = requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function updatePhysics(dt) {
+        // Semi-implicit Euler integration
+        ball.v += GRAVITY * dt;
+        ball.y += ball.v * dt * PIXELS_PER_METER;
+
+        // Collision logic
+        if (ball.y >= FLOOR_Y - BALL_RADIUS) {
+            ball.y = FLOOR_Y - BALL_RADIUS; // Snap to floor
+            
+            let lossPercentage = parseFloat(lossSlider.value) / 100;
+            
+            // v_new = v_old * sqrt(1 - loss)
+            // This satisfies KE_new = KE_old * (1 - loss)
+            ball.v = -Math.abs(ball.v) * Math.sqrt(1 - lossPercentage);
+            
+            // Update bounce data based on theoretical math
+            bounces++;
+            currentPeak = currentPeak * (1 - lossPercentage);
+            
+            // Stop logic for negligible bounces
+            if (currentPeak < 0.01) {
+                currentPeak = 0;
+                ball.v = 0;
+                ball.y = FLOOR_Y - BALL_RADIUS;
+                state = 'idle'; // End simulation
+            } else {
+                peakHeights.push(currentPeak);
+            }
+            
+            updateDashboard();
+        }
+    }
+
+    // Rendering
+    function draw() {
+        // Clear Canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Floor
+        ctx.fillStyle = '#495057';
+        ctx.fillRect(0, FLOOR_Y, canvas.width, canvas.height - FLOOR_Y);
+
+        // Draw Peak Height Markers
+        ctx.strokeStyle = 'rgba(0, 123, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+
+        peakHeights.forEach(h => {
+            let markerY = FLOOR_Y - (h * PIXELS_PER_METER) - BALL_RADIUS;
+            ctx.beginPath();
+            ctx.moveTo(0, markerY);
+            ctx.lineTo(canvas.width, markerY);
+            ctx.stroke();
+        });
+        ctx.setLineDash([]); // Reset line dash
+
+        // Draw Ball
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = '#ccff00'; // Tennis ball color
+        ctx.fill();
+        ctx.strokeStyle = '#88aa00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Optional: Draw tennis ball lines
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2 - 8, ball.y, BALL_RADIUS - 2, -Math.PI/3, Math.PI/3);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    // Initialize on load
+    resetSimulation();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfectly Inelastic Collision Visualization</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #dc2626;
+            --bg-color: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 0;
+            color: var(--text-dark);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 860px;
+            height: auto;
+            background: #e0f2fe;
+            border: 2px solid #cbd5e1;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+
+        .controls-dashboard-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .controls, .dashboard {
+            flex: 1;
+            min-width: 300px;
+            background: var(--bg-color);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border: 1px solid #e2e8f0;
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #cbd5e1;
+            padding-bottom: 5px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: white;
+        }
+
+        #playBtn { background-color: #16a34a; }
+        #playBtn:hover { background-color: #15803d; }
+        
+        #pauseBtn { background-color: #ca8a04; }
+        #pauseBtn:hover { background-color: #a16207; }
+        
+        #resetBtn { background-color: #475569; }
+        #resetBtn:hover { background-color: #334155; }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: var(--panel-bg);
+            border-radius: 4px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .data-label {
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+
+        .data-value {
+            font-family: monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .energy-loss {
+            color: var(--secondary);
+            font-weight: bold;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+
+        .energy-loss.active {
+            opacity: 1;
+        }
+
+        .match-highlight {
+            color: var(--primary);
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Perfectly Inelastic Collision</h1>
+    
+    <canvas id="simCanvas" width="860" height="250"></canvas>
+
+    <div class="controls-dashboard-wrapper">
+        <div class="controls">
+            <h2>Initial Parameters</h2>
+            
+            <div class="control-group">
+                <label>Runner Mass (m₁): <span id="m1-val">70 kg</span></label>
+                <input type="range" id="m1" min="20" max="150" value="70" step="1">
+            </div>
+            
+            <div class="control-group">
+                <label>Runner Velocity (v₁): <span id="v1-val">3.0 m/s</span></label>
+                <input type="range" id="v1" min="1" max="10" value="3" step="0.1">
+            </div>
+            
+            <div class="control-group">
+                <label>Cart Mass (m₂): <span id="m2-val">140 kg</span></label>
+                <input type="range" id="m2" min="50" max="300" value="140" step="1">
+            </div>
+
+            <div class="btn-group">
+                <button id="playBtn">Play</button>
+                <button id="pauseBtn">Pause</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <h2>Calculations Dashboard</h2>
+            
+            <h3 style="font-size: 1rem; margin: 5px 0; color: #475569;">Momentum (p = m × v)</h3>
+            <div class="data-row">
+                <span class="data-label">Total Initial Momentum:</span>
+                <span class="data-value match-highlight" id="pi-val">0 kg·m/s</span>
+            </div>
+            <div class="data-row">
+                <span class="data-label">Total Final Momentum:</span>
+                <span class="data-value match-highlight" id="pf-val">0 kg·m/s</span>
+            </div>
+
+            <h3 style="font-size: 1rem; margin: 15px 0 5px 0; color: #475569;">Kinetic Energy (KE = ½mv²)</h3>
+            <div class="data-row">
+                <span class="data-label">Initial KE:</span>
+                <span class="data-value" id="kei-val">0 J</span>
+            </div>
+            <div class="data-row">
+                <span class="data-label">Final KE:</span>
+                <span class="data-value" id="kef-val">0 J</span>
+            </div>
+            <div class="data-row" style="background: transparent; box-shadow: none;">
+                <span class="data-label">Energy Lost as Heat/Sound:</span>
+                <span class="data-value energy-loss" id="ke-loss-val">0 J</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI Elements
+    const sliders = {
+        m1: document.getElementById('m1'),
+        v1: document.getElementById('v1'),
+        m2: document.getElementById('m2')
+    };
+    
+    const displays = {
+        m1: document.getElementById('m1-val'),
+        v1: document.getElementById('v1-val'),
+        m2: document.getElementById('m2-val'),
+        pi: document.getElementById('pi-val'),
+        pf: document.getElementById('pf-val'),
+        kei: document.getElementById('kei-val'),
+        kef: document.getElementById('kef-val'),
+        loss: document.getElementById('ke-loss-val')
+    };
+
+    const buttons = {
+        play: document.getElementById('playBtn'),
+        pause: document.getElementById('pauseBtn'),
+        reset: document.getElementById('resetBtn')
+    };
+
+    // Simulation State
+    let state = {
+        m1: 70, v1: 3, x1: 50, w1: 40, h1: 60,
+        m2: 140, v2: 0, x2: 400, w2: 80, h2: 50,
+        vf: 0,
+        isPlaying: false,
+        hasCollided: false,
+        pixelsPerMeter: 30, // Scale for rendering velocity
+        lastTime: 0
+    };
+
+    // Physics Calculations
+    function updatePhysicsCalculations() {
+        // Initial State
+        const pi = state.m1 * state.v1 + state.m2 * state.v2;
+        const kei = 0.5 * state.m1 * Math.pow(state.v1, 2) + 0.5 * state.m2 * Math.pow(state.v2, 2);
+
+        // Final State (Perfectly Inelastic: they stick together)
+        state.vf = pi / (state.m1 + state.m2);
+        const pf = (state.m1 + state.m2) * state.vf; // Should equal pi
+        const kef = 0.5 * (state.m1 + state.m2) * Math.pow(state.vf, 2);
+        
+        const loss = kei - kef;
+
+        // Update Dashboard
+        displays.pi.textContent = pi.toFixed(1) + " kg·m/s";
+        displays.pf.textContent = pf.toFixed(1) + " kg·m/s";
+        displays.kei.textContent = kei.toFixed(1) + " J";
+        displays.kef.textContent = kef.toFixed(1) + " J";
+        displays.loss.textContent = loss.toFixed(1) + " J";
+
+        if (state.hasCollided) {
+            displays.loss.classList.add('active');
+        } else {
+            displays.loss.classList.remove('active');
+        }
+    }
+
+    // Drawing Functions
+    function drawGround() {
+        ctx.fillStyle = '#65a30d'; // Grass green
+        ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+        ctx.fillStyle = '#475569'; // Track line
+        ctx.fillRect(0, canvas.height - 40, canvas.width, 4);
+    }
+
+    function drawRunner() {
+        const y = canvas.height - 40 - state.h1;
+        
+        // Draw Runner (Blue box representing mass)
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(state.x1, y, state.w1, state.h1);
+        
+        // Label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('m₁', state.x1 + state.w1/2, y + state.h1/2 + 5);
+
+        // Velocity vector (if moving)
+        if (state.v1 > 0 && !state.hasCollided) {
+            drawArrow(state.x1 + state.w1/2, y - 15, state.v1 * 10);
+        }
+    }
+
+    function drawCart() {
+        const y = canvas.height - 40 - state.h2 - 10; // -10 for wheels
+        
+        // Cart Body (Red Box)
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(state.x2, y, state.w2, state.h2);
+        
+        // Wheels
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(state.x2 + 15, y + state.h2 + 5, 10, 0, Math.PI * 2);
+        ctx.arc(state.x2 + state.w2 - 15, y + state.h2 + 5, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('m₂', state.x2 + state.w2/2, y + state.h2/2 + 5);
+
+        // Velocity vector (if moving after collision)
+        if (state.hasCollided && state.vf > 0) {
+            // Draw shared velocity arrow
+            drawArrow(state.x1 + (state.w1 + state.w2)/2, y - 15, state.vf * 10);
+        }
+    }
+
+    function drawArrow(x, y, length) {
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + length, y);
+        ctx.lineTo(x + length - 5, y - 4);
+        ctx.moveTo(x + length, y);
+        ctx.lineTo(x + length - 5, y + 4);
+        ctx.stroke();
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGround();
+        drawCart(); // Draw cart first so runner overlaps nicely if needed
+        drawRunner();
+    }
+
+    // Animation Loop
+    function animate(timestamp) {
+        if (!state.lastTime) state.lastTime = timestamp;
+        const dt = (timestamp - state.lastTime) / 1000; // Delta time in seconds
+        state.lastTime = timestamp;
+
+        if (state.isPlaying) {
+            if (!state.hasCollided) {
+                // Runner moves independently
+                state.x1 += state.v1 * state.pixelsPerMeter * dt;
+
+                // Collision Detection
+                if (state.x1 + state.w1 >= state.x2) {
+                    state.x1 = state.x2 - state.w1; // Snap to touching
+                    state.hasCollided = true;
+                    updatePhysicsCalculations(); // Trigger active loss highlighting
+                }
+            } else {
+                // Post-collision: they move together at shared velocity
+                state.x1 += state.vf * state.pixelsPerMeter * dt;
+                state.x2 += state.vf * state.pixelsPerMeter * dt;
+            }
+
+            // Optional: Pause when they run off screen to right
+            if (state.x1 > canvas.width) {
+                state.isPlaying = false;
+            }
+        }
+
+        render();
+
+        if (state.isPlaying) {
+            requestAnimationFrame(animate);
+        }
+    }
+
+    // Event Handlers
+    function readSliders() {
+        if (state.isPlaying || state.hasCollided) return; // Prevent changing parameters mid-flight
+
+        state.m1 = parseFloat(sliders.m1.value);
+        state.v1 = parseFloat(sliders.v1.value);
+        state.m2 = parseFloat(sliders.m2.value);
+
+        displays.m1.textContent = state.m1 + " kg";
+        displays.v1.textContent = state.v1.toFixed(1) + " m/s";
+        displays.m2.textContent = state.m2 + " kg";
+
+        // Size scaling for visual effect (optional, subtle scaling)
+        state.w1 = 30 + (state.m1 / 150) * 20;
+        state.w2 = 60 + (state.m2 / 300) * 40;
+
+        updatePhysicsCalculations();
+        render();
+    }
+
+    // Attach slider events
+    ['input'].forEach(evt => {
+        sliders.m1.addEventListener(evt, readSliders);
+        sliders.v1.addEventListener(evt, readSliders);
+        sliders.m2.addEventListener(evt, readSliders);
+    });
+
+    // Buttons
+    buttons.play.addEventListener('click', () => {
+        if (!state.isPlaying) {
+            state.isPlaying = true;
+            state.lastTime = performance.now();
+            requestAnimationFrame(animate);
+        }
+    });
+
+    buttons.pause.addEventListener('click', () => {
+        state.isPlaying = false;
+    });
+
+    buttons.reset.addEventListener('click', () => {
+        state.isPlaying = false;
+        state.hasCollided = false;
+        state.x1 = 50;
+        state.x2 = 400;
+        state.lastTime = 0;
+        
+        // Ensure inputs are re-enabled and state matches inputs
+        readSliders(); 
+        updatePhysicsCalculations(); // Turn off active red highlight
+        render();
+    });
+
+    // Initialize Setup
+    readSliders();
+</script>
+
+</body>
+</html>

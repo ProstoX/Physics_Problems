@@ -1,3 +1,16 @@
+## 7. Elimination of time and interpretation of acceleration
+
+The path equation is given in parametric form:
+
+$$
+x(t)=2t^2, \qquad y(t)=3t^3
+$$
+
+* Eliminate the parameter $t$.
+* Draw the trajectory.
+* Calculate $\vec v(t)$, $|\vec v(t)|$, $\vec a(t)$ and $|\vec a(t)|$.
+* Is the acceleration constant?
+
 ### Variables and Units Glossary
 
 Here is a quick breakdown of the symbols used in this problem and their standard SI units:

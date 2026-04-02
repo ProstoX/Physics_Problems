@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Particle Motion Visualization</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.85);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --vel-color: #22c55e;
+            --acc-color: #ef4444;
+            --force-color: #3b82f6;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Overlay Panels */
+        .panel {
+            position: absolute;
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 10;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Right Sidebar for Data */
+        #data-sidebar {
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        #data-sidebar h2 {
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+
+        .data-group {
+            margin-bottom: 15px;
+        }
+
+        .data-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+        }
+
+        .data-value {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Color indicators for vectors */
+        .indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .ind-v { background-color: var(--vel-color); }
+        .ind-a { background-color: var(--acc-color); }
+        .ind-f { background-color: var(--force-color); }
+
+        /* Bottom Control Panel */
+        #controls-panel {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .playback-controls {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* Slider */
+        .slider-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            margin-top: -6px;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        #time-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            width: 60px;
+            text-align: right;
+        }
+        
+        .equation-note {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="data-sidebar" class="panel">
+        <h2>Real-Time Metrics</h2>
+        
+        <div class="data-group">
+            <div class="data-label">Time (t)</div>
+            <div class="data-value" id="val-t">0.00 s</div>
+        </div>
+
+        <div class="data-group">
+            <div class="data-label">Position [x, y, z]</div>
+            <div class="data-value" id="val-pos">[0.00, 0.00, 2.00]</div>
+        </div>
+
+        <div class="data-group">
+            <div class="data-label"><span class="indicator ind-v"></span>Velocity (v)</div>
+            <div class="data-value" id="val-vel">[-1.00, 0.00, -3.00]</div>
+        </div>
+        
+        <div class="data-group">
+            <div class="data-label">Momentum (p = mv)</div>
+            <div class="data-value" id="val-mom">[-0.50, 0.00, -1.50]</div>
+        </div>
+
+        <div class="data-group">
+            <div class="data-label"><span class="indicator ind-a"></span>Acceleration (a)</div>
+            <div class="data-value" id="val-acc">[10.00, 0.00, 0.00]</div>
+        </div>
+
+        <div class="data-group">
+            <div class="data-label"><span class="indicator ind-f"></span>Force (F = ma)</div>
+            <div class="data-value" id="val-force">[5.00, 0.00, 0.00]</div>
+        </div>
+
+        <div class="data-group">
+            <div class="data-label">Power (P)</div>
+            <div class="data-value" id="val-power">-5.00 W</div>
+        </div>
+        
+        <div class="equation-note">
+            Mass (m) = 0.5 kg<br>
+            *Note: Force vector origin is slightly offset from Acceleration to maintain visibility, as they share the same direction.
+        </div>
+    </div>
+
+    <div id="controls-panel" class="panel">
+        <div class="slider-container">
+            <span>t = 0</span>
+            <input type="range" id="time-slider" min="0" max="5" step="0.01" value="0">
+            <span>t = 5</span>
+            <div id="time-display">0.00s</div>
+        </div>
+        <div class="playback-controls">
+            <button id="btn-play">Play</button>
+            <button id="btn-reset">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Kinematic and Dynamic Functions ---
+        const m = 0.5;
+
+        const x = (t) => 5 * t * t - t;
+        const y = (t) => 2 * t * t * t;
+        const z = (t) => -3 * t + 2;
+
+        const vx = (t) => 10 * t - 1;
+        const vy = (t) => 6 * t * t;
+        const vz = (t) => -3;
+
+        const ax = (t) => 10;
+        const ay = (t) => 12 * t;
+        const az = (t) => 0;
+
+        const Fx = (t) => 5;
+        const Fy = (t) => 6 * t;
+        const Fz = (t) => 0;
+
+        const P = (t) => 36 * Math.pow(t, 3) + 50 * t - 5;
+
+        // --- Application State ---
+        let state = {
+            t: 0,
+            isPlaying: false,
+            maxT: 5,
+            speed: 0.5 // multiplier for real-time speed
+        };
+
+        // --- DOM Elements ---
+        const ui = {
+            t: document.getElementById('val-t'),
+            pos: document.getElementById('val-pos'),
+            vel: document.getElementById('val-vel'),
+            mom: document.getElementById('val-mom'),
+            acc: document.getElementById('val-acc'),
+            force: document.getElementById('val-force'),
+            power: document.getElementById('val-power'),
+            slider: document.getElementById('time-slider'),
+            timeDisplay: document.getElementById('time-display'),
+            btnPlay: document.getElementById('btn-play'),
+            btnReset: document.getElementById('btn-reset')
+        };
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); // Match CSS background
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+        // Position camera to see the full path up to t=5 (max Y is 250, max X is 120)
+        camera.position.set(200, 150, 300);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(60, 100, 0); // Point roughly to the center of the trajectory
+        controls.update();
+
+        // Environment Helpers
+        const gridHelper = new THREE.GridHelper(400, 40, 0x334155, 0x1e293b);
+        gridHelper.position.y = -20; // Slightly below start
+        scene.add(gridHelper);
+
+        const axesHelper = new THREE.AxesHelper(150);
+        scene.add(axesHelper);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 200, 50);
+        scene.add(dirLight);
+
+        // --- Objects ---
+
+        // 1. Particle
+        const particleGeo = new THREE.SphereGeometry(3, 32, 32);
+        const particleMat = new THREE.MeshPhongMaterial({ 
+            color: 0xffffff,
+            emissive: 0x444444,
+            shininess: 100 
+        });
+        const particle = new THREE.Mesh(particleGeo, particleMat);
+        scene.add(particle);
+
+        // 2. Trajectory Path
+        const pathPoints = [];
+        const numSegments = 500;
+        for (let i = 0; i <= numSegments; i++) {
+            let tStep = (i / numSegments) * state.maxT;
+            pathPoints.push(new THREE.Vector3(x(tStep), y(tStep), z(tStep)));
+        }
+        const pathGeo = new THREE.BufferGeometry().setFromPoints(pathPoints);
+        const pathMat = new THREE.LineBasicMaterial({ 
+            color: 0x94a3b8, 
+            linewidth: 2,
+            transparent: true,
+            opacity: 0.6
+        });
+        const pathLine = new THREE.Line(pathGeo, pathMat);
+        scene.add(pathLine);
+
+        // 3. Vectors (Arrows)
+        const velColor = 0x22c55e;
+        const accColor = 0xef4444;
+        const forceColor = 0x3b82f6;
+        
+        // ArrowHelper parameters: direction, origin, length, color
+        const velArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), 10, velColor);
+        const accArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), 10, accColor);
+        const forceArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), 10, forceColor);
+        
+        // Increase arrow thicknesses visually by adjusting head size
+        velArrow.line.material.linewidth = 2;
+        
+        scene.add(velArrow);
+        scene.add(accArrow);
+        scene.add(forceArrow);
+
+        // --- Update Logic ---
+        function formatNumber(num) {
+            return num.toFixed(2).padStart(6, ' ');
+        }
+
+        function updateSceneAndUI() {
+            let t = state.t;
+
+            // Compute current values
+            let curX = x(t), curY = y(t), curZ = z(t);
+            let curVx = vx(t), curVy = vy(t), curVz = vz(t);
+            let curAx = ax(t), curAy = ay(t), curAz = az(t);
+            let curFx = Fx(t), curFy = Fy(t), curFz = Fz(t);
+            let curP = P(t);
+
+            // Update DOM
+            ui.t.innerText = `${t.toFixed(2)} s`;
+            ui.pos.innerText = `[${formatNumber(curX)}, ${formatNumber(curY)}, ${formatNumber(curZ)}]`;
+            ui.vel.innerText = `[${formatNumber(curVx)}, ${formatNumber(curVy)}, ${formatNumber(curVz)}]`;
+            ui.mom.innerText = `[${formatNumber(curVx * m)}, ${formatNumber(curVy * m)}, ${formatNumber(curVz * m)}]`;
+            ui.acc.innerText = `[${formatNumber(curAx)}, ${formatNumber(curAy)}, ${formatNumber(curAz)}]`;
+            ui.force.innerText = `[${formatNumber(curFx)}, ${formatNumber(curFy)}, ${formatNumber(curFz)}]`;
+            ui.power.innerText = `${formatNumber(curP)} W`;
+
+            ui.slider.value = t;
+            ui.timeDisplay.innerText = `${t.toFixed(2)}s`;
+
+            // Update 3D Particle
+            const posVec = new THREE.Vector3(curX, curY, curZ);
+            particle.position.copy(posVec);
+
+            // Update Path (draw only up to current t)
+            const drawCount = Math.floor((t / state.maxT) * numSegments);
+            pathLine.geometry.setDrawRange(0, drawCount);
+
+            // Update Vectors
+            const velVec = new THREE.Vector3(curVx, curVy, curVz);
+            const accVec = new THREE.Vector3(curAx, curAy, curAz);
+            const forceVec = new THREE.Vector3(curFx, curFy, curFz);
+
+            // Set Velocity Arrow
+            if(velVec.lengthSq() > 0.001) {
+                velArrow.setDirection(velVec.clone().normalize());
+                velArrow.setLength(velVec.length());
+                velArrow.position.copy(posVec);
+                velArrow.visible = true;
+            } else velArrow.visible = false;
+
+            // Set Acceleration Arrow
+            if(accVec.lengthSq() > 0.001) {
+                accArrow.setDirection(accVec.clone().normalize());
+                accArrow.setLength(accVec.length());
+                accArrow.position.copy(posVec);
+                accArrow.visible = true;
+            } else accArrow.visible = false;
+
+            // Set Force Arrow (Offset slightly so it doesn't z-fight with Acceleration)
+            if(forceVec.lengthSq() > 0.001) {
+                forceArrow.setDirection(forceVec.clone().normalize());
+                forceArrow.setLength(forceVec.length());
+                // Offset origin by a tiny amount in Z to keep it visible inside the acceleration vector
+                forceArrow.position.copy(posVec).add(new THREE.Vector3(0, 0, 1.5));
+                forceArrow.visible = true;
+            } else forceArrow.visible = false;
+        }
+
+        // --- Event Listeners ---
+        ui.btnPlay.addEventListener('click', () => {
+            if (state.t >= state.maxT) {
+                state.t = 0; // Restart if at end
+            }
+            state.isPlaying = !state.isPlaying;
+            ui.btnPlay.innerText = state.isPlaying ? 'Pause' : 'Play';
+            lastTime = performance.now();
+        });
+
+        ui.btnReset.addEventListener('click', () => {
+            state.isPlaying = false;
+            ui.btnPlay.innerText = 'Play';
+            state.t = 0;
+            updateSceneAndUI();
+        });
+
+        ui.slider.addEventListener('input', (e) => {
+            state.isPlaying = false;
+            ui.btnPlay.innerText = 'Play';
+            state.t = parseFloat(e.target.value);
+            updateSceneAndUI();
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Animation Loop ---
+        let lastTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            let currentTime = performance.now();
+            let dt = (currentTime - lastTime) / 1000; // in seconds
+            lastTime = currentTime;
+
+            if (state.isPlaying) {
+                state.t += dt * state.speed;
+                if (state.t > state.maxT) {
+                    state.t = state.maxT;
+                    state.isPlaying = false;
+                    ui.btnPlay.innerText = 'Play';
+                }
+                updateSceneAndUI();
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Initialize
+        updateSceneAndUI();
+        animate();
+
+    </script>
+</body>
+</html>

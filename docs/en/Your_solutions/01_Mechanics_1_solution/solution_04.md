@@ -1,4 +1,6 @@
-Here is the step-by-step solution to your vector calculus problem, complete with the variable glossary and a prompt to generate an interactive HTML visualization.
+## 4. Vector Calculus
+
+The position of an object is given by $\vec{r}(t) = (3t^2)\hat{i} + (5t - 8t^2)\hat{j}$. Find the object's velocity and acceleration vectors as a function of time.
 
 ### Variables and Units Glossary
 

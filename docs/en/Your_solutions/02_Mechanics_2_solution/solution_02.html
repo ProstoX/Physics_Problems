@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Mass–Spring SHM — Simple Harmonic Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ──────────────────────────────────────────── */
+:root {
+  --bg:        #07090f;
+  --surface:   #0d1119;
+  --panel:     #111622;
+  --border:    #1e2638;
+  --border2:   #2a3448;
+  --ke:        #22d3a8;
+  --pe:        #f97316;
+  --total:     #a78bfa;
+  --text:      #c8d4e8;
+  --soft:      #5a6880;
+  --dim:       #2e3a50;
+  --accent:    #38bdf8;
+  --accent2:   #7dd3fc;
+  --grid:      rgba(56,189,248,0.04);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 16px 52px;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── HEADER ─────────────────────────────────────────── */
+header { text-align: center; margin-bottom: 28px; }
+.badge {
+  display: inline-block;
+  font-size: 9px; letter-spacing: 4px; text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(56,189,248,0.3);
+  padding: 3px 12px; border-radius: 2px; margin-bottom: 10px;
+  background: rgba(56,189,248,0.05);
+}
+h1 {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(22px, 4vw, 38px); letter-spacing: -1px;
+  color: #fff; line-height: 1.1;
+}
+h1 span { color: var(--accent); }
+.eq { margin-top: 7px; font-size: 12px; color: var(--soft); font-style: italic; letter-spacing: 0.5px; }
+
+/* ── OUTER WRAPPER ───────────────────────────────────── */
+.wrapper { width: 100%; max-width: 1020px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── CANVAS CARD ─────────────────────────────────────── */
+.canvas-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px; overflow: hidden;
+}
+.canvas-wrap canvas { display: block; width: 100%; height: auto; }
+
+/* ── BOTTOM GRID ─────────────────────────────────────── */
+.bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 700px) { .bottom { grid-template-columns: 1fr; } }
+
+/* ── CARD ────────────────────────────────────────────── */
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 18px 20px; }
+.card-title {
+  font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 600;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--accent);
+  margin-bottom: 14px; padding-bottom: 9px; border-bottom: 1px solid var(--border);
+}
+
+/* ── CONSTANTS TABLE ─────────────────────────────────── */
+.const-list { display: flex; flex-direction: column; gap: 9px; }
+.const-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.const-key { font-size: 10px; color: var(--soft); flex-shrink: 0; letter-spacing: 0.5px; }
+.const-val { font-size: 13px; color: var(--text); font-weight: 500; text-align: right; }
+.const-val .hi { color: var(--accent2); }
+
+/* ── LIVE TELEMETRY ──────────────────────────────────── */
+.tele-list { display: flex; flex-direction: column; gap: 10px; }
+.tele-row { display: flex; justify-content: space-between; align-items: center; }
+.tele-label { font-size: 10px; color: var(--soft); letter-spacing: 0.5px; }
+.tele-val { font-size: 15px; font-weight: 500; letter-spacing: 0.5px; min-width: 100px; text-align: right; }
+.tele-val.pos  { color: var(--accent2); }
+.tele-val.time { color: var(--text); }
+.tele-val.ke   { color: var(--ke); }
+.tele-val.pe   { color: var(--pe); }
+.tele-val.tot  { color: var(--total); }
+
+/* ── ENERGY BARS ─────────────────────────────────────── */
+.energy-section { display: flex; flex-direction: column; gap: 13px; }
+.bar-group { display: flex; flex-direction: column; gap: 5px; }
+.bar-header { display: flex; justify-content: space-between; font-size: 10px; }
+.bar-name { color: var(--soft); }
+.bar-num { font-size: 11px; font-weight: 500; }
+.bar-num.ke  { color: var(--ke); }
+.bar-num.pe  { color: var(--pe); }
+.bar-num.tot { color: var(--total); }
+.bar-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.04s linear; }
+.bar-fill.ke  { background: var(--ke);    box-shadow: 0 0 8px rgba(34,211,168,0.4); }
+.bar-fill.pe  { background: var(--pe);    box-shadow: 0 0 8px rgba(249,115,22,0.4); }
+.bar-fill.tot { background: var(--total); width: 100% !important; }
+
+/* ── CONTROLS ────────────────────────────────────────── */
+.controls {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 6px; flex-wrap: wrap;
+}
+.controls-label { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--soft); margin-right: 4px; }
+.btn {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 9px 22px; border-radius: 3px; cursor: pointer; border: none; transition: all .18s;
+}
+.btn-play { background: var(--accent); color: var(--bg); font-weight: 500; }
+.btn-play:hover { background: var(--accent2); }
+.btn-play.paused { background: var(--ke); }
+.btn-play.paused:hover { background: #4eeabd; }
+.btn-reset { background: transparent; border: 1px solid var(--border2); color: var(--soft); }
+.btn-reset:hover { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,0.06); }
+.phase-indicator { margin-left: auto; font-size: 10px; color: var(--soft); letter-spacing: 1px; }
+.phase-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ke); margin-right: 6px;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+.phase-dot.paused { animation: none; background: var(--soft); }
+
+footer { margin-top: 24px; font-size: 10px; color: var(--dim); letter-spacing: 1px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Physics Simulation</div>
+  <h1>Mass–Spring <span>SHM</span></h1>
+  <div class="eq">x(t) = 0.2 · cos(10π · t) &nbsp;|&nbsp; Simple Harmonic Motion</div>
+</header>
+
+<div class="wrapper">
+
+  <!-- Canvas -->
+  <div class="canvas-wrap">
+    <canvas id="c" width="1000" height="260"></canvas>
+  </div>
+
+  <!-- Controls bar -->
+  <div class="controls">
+    <span class="controls-label">Controls</span>
+    <button class="btn btn-play" id="btnPlay">⏸ Pause</button>
+    <button class="btn btn-reset" id="btnReset">↺ Reset</button>
+    <div class="phase-indicator">
+      <span class="phase-dot" id="phaseDot"></span>
+      <span id="phaseText">OSCILLATING</span>
+    </div>
+  </div>
+
+  <!-- Bottom 3-column grid -->
+  <div class="bottom">
+
+    <!-- Constants -->
+    <div class="card">
+      <div class="card-title">Physical Constants</div>
+      <div class="const-list">
+        <div class="const-row">
+          <span class="const-key">Mass (m)</span>
+          <span class="const-val"><span class="hi">10</span> kg</span>
+        </div>
+        <div class="const-row">
+          <span class="const-key">Spring k</span>
+          <span class="const-val"><span class="hi">1000π²</span> N/m</span>
+        </div>
+        <div class="const-row">
+          <span class="const-key">Amplitude A</span>
+          <span class="const-val"><span class="hi">0.200</span> m</span>
+        </div>
+        <div class="const-row">
+          <span class="const-key">Angular freq ω</span>
+          <span class="const-val"><span class="hi">10π</span> rad/s</span>
+        </div>
+        <div class="const-row">
+          <span class="const-key">Period T</span>
+          <span class="const-val"><span class="hi">0.200</span> s</span>
+        </div>
+        <div class="const-row">
+          <span class="const-key">Total Energy E</span>
+          <span class="const-val"><span class="hi">20π²</span> J</span>
+        </div>
+        <div class="const-row">
+          <span class="const-key">≈ E</span>
+          <span class="const-val"><span class="hi">197.392</span> J</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live telemetry -->
+    <div class="card">
+      <div class="card-title">Live Telemetry</div>
+      <div class="tele-list">
+        <div class="tele-row">
+          <span class="tele-label">Time t</span>
+          <span class="tele-val time" id="rTime">0.0000 s</span>
+        </div>
+        <div class="tele-row">
+          <span class="tele-label">Position x(t)</span>
+          <span class="tele-val pos" id="rPos">+0.2000 m</span>
+        </div>
+        <div class="tele-row">
+          <span class="tele-label">Velocity v(t)</span>
+          <span class="tele-val pos" id="rVel">0.000 m/s</span>
+        </div>
+        <div class="tele-row">
+          <span class="tele-label">Kinetic Energy</span>
+          <span class="tele-val ke" id="rKE">0.000 J</span>
+        </div>
+        <div class="tele-row">
+          <span class="tele-label">Potential Energy</span>
+          <span class="tele-val pe" id="rPE">197.392 J</span>
+        </div>
+        <div class="tele-row">
+          <span class="tele-label">Total E (KE+PE)</span>
+          <span class="tele-val tot" id="rTot">197.392 J</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Energy bars -->
+    <div class="card">
+      <div class="card-title">Energy Distribution</div>
+      <div class="energy-section">
+        <div class="bar-group">
+          <div class="bar-header">
+            <span class="bar-name">Kinetic Energy (KE)</span>
+            <span class="bar-num ke" id="bKENum">0.0%</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill ke" id="bKE" style="width:0%"></div></div>
+        </div>
+        <div class="bar-group">
+          <div class="bar-header">
+            <span class="bar-name">Potential Energy (PE)</span>
+            <span class="bar-num pe" id="bPENum">100.0%</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill pe" id="bPE" style="width:100%"></div></div>
+        </div>
+        <div class="bar-group">
+          <div class="bar-header">
+            <span class="bar-name">Total Energy (E)</span>
+            <span class="bar-num tot">100.0% — constant</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill tot"></div></div>
+        </div>
+        <div style="margin-top:4px; font-size:10px; color:var(--soft); line-height:1.7;">
+          <span style="color:var(--ke)">KE</span> = ½mv² &nbsp;·&nbsp;
+          <span style="color:var(--pe)">PE</span> = ½kx²<br>
+          <span style="color:var(--total)">E</span> = KE + PE = 20π² J always
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>x(t) = A·cos(ωt) &nbsp;·&nbsp; ω = √(k/m) = 10π rad/s &nbsp;·&nbsp; T = 2π/ω = 0.2 s &nbsp;·&nbsp; frictionless surface</footer>
+
+<script>
+(() => {
+  // ── Physics constants ─────────────────────
+  const A  = 0.2;
+  const OM = 10 * Math.PI;
+  const m  = 10;
+  const k  = 1000 * Math.PI * Math.PI;
+  const E  = 0.5 * k * A * A;       // 20π² ≈ 197.392 J
+
+  // ── State ─────────────────────────────────
+  let t       = 0;
+  let running = true;
+  let lastTS  = null;
+
+  // ── Canvas ────────────────────────────────
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const WALL_W   = 44;
+  const FLOOR_Y  = CH - 48;
+  const EQUIL_X  = 590;       // equilibrium centre-x of block
+  const BLOCK_W  = 76;
+  const BLOCK_H  = 56;
+  const PX_PER_M = 310;
+  const BLOCK_CY = FLOOR_Y - BLOCK_H / 2;
+  const TRAIL_MAX = 300;
+  const posTrail = [];
+
+  function blockLeft(x) {
+    return EQUIL_X + x * PX_PER_M - BLOCK_W / 2;
+  }
+
+  // ── Zigzag spring ──────────────────────────
+  function pathSpring(x1, x2, y, coils, amp) {
+    const len = x2 - x1;
+    const seg = len / (coils * 2 + 2);
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x1 + seg, y);
+    for (let i = 0; i < coils; i++) {
+      ctx.lineTo(x1 + seg * (2*i+2) - seg/2, y - amp);
+      ctx.lineTo(x1 + seg * (2*i+2) + seg/2, y + amp);
+    }
+    ctx.lineTo(x2, y);
+  }
+
+  // ── Draw ──────────────────────────────────
+  function draw(x) {
+    ctx.clearRect(0, 0, CW, CH);
+
+    const bL = blockLeft(x);
+    const bR = bL + BLOCK_W;
+    const bT = FLOOR_Y - BLOCK_H;
+
+    // background
+    ctx.fillStyle = '#07090f';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // subtle grid
+    ctx.strokeStyle = 'rgba(56,189,248,0.035)';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx < CW; gx += 40) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CH); ctx.stroke();
+    }
+    for (let gy = 0; gy < CH; gy += 40) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(CW, gy); ctx.stroke();
+    }
+
+    // amplitude boundary markers
+    ctx.save();
+    ctx.setLineDash([3, 7]);
+    ctx.lineWidth = 1;
+    [A, -A].forEach((ax, i) => {
+      const bx = EQUIL_X + ax * PX_PER_M;
+      ctx.strokeStyle = 'rgba(249,115,22,0.2)';
+      ctx.beginPath(); ctx.moveTo(bx, 12); ctx.lineTo(bx, FLOOR_Y); ctx.stroke();
+      ctx.fillStyle = 'rgba(249,115,22,0.5)';
+      ctx.font = '9px IBM Plex Mono';
+      ctx.fillText(i === 0 ? '+A' : '−A', bx + 4, 24);
+    });
+    ctx.restore();
+
+    // equilibrium line
+    ctx.save();
+    ctx.setLineDash([4, 6]);
+    ctx.strokeStyle = 'rgba(56,189,248,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(EQUIL_X, 12); ctx.lineTo(EQUIL_X, FLOOR_Y); ctx.stroke();
+    ctx.fillStyle = 'rgba(56,189,248,0.4)';
+    ctx.font = '9px IBM Plex Mono';
+    ctx.fillText('x=0', EQUIL_X + 4, 24);
+    ctx.restore();
+
+    // position trail
+    posTrail.push(bL + BLOCK_W / 2);
+    if (posTrail.length > TRAIL_MAX) posTrail.shift();
+    ctx.save();
+    posTrail.forEach((px, i) => {
+      const frac = i / posTrail.length;
+      ctx.beginPath();
+      ctx.arc(px, BLOCK_CY - BLOCK_H/2 - 3, 1.5, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(34,211,168,${frac * 0.2})`;
+      ctx.fill();
+    });
+    ctx.restore();
+
+    // displacement arrow
+    if (Math.abs(x) > 0.004) {
+      const ay = bT - 13;
+      const dir = x > 0 ? 1 : -1;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(125,211,252,0.65)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(EQUIL_X, ay); ctx.lineTo(bL + BLOCK_W/2, ay); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(125,211,252,0.65)';
+      const ax2 = bL + BLOCK_W/2;
+      ctx.beginPath(); ctx.moveTo(ax2, ay); ctx.lineTo(ax2 - dir*8, ay-3.5); ctx.lineTo(ax2 - dir*8, ay+3.5); ctx.closePath(); ctx.fill();
+      ctx.font = 'italic 10px IBM Plex Mono';
+      ctx.fillStyle = 'rgba(125,211,252,0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText((x >= 0 ? '+' : '') + x.toFixed(3) + ' m', (EQUIL_X + bL + BLOCK_W/2)/2, ay - 8);
+      ctx.restore();
+    }
+
+    // floor
+    const flGrad = ctx.createLinearGradient(0, FLOOR_Y, 0, CH);
+    flGrad.addColorStop(0, '#182030');
+    flGrad.addColorStop(1, '#0d1422');
+    ctx.fillStyle = flGrad;
+    ctx.fillRect(0, FLOOR_Y, CW, CH - FLOOR_Y);
+    ctx.strokeStyle = 'rgba(56,189,248,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, FLOOR_Y); ctx.lineTo(CW, FLOOR_Y); ctx.stroke();
+    // floor tick marks
+    ctx.strokeStyle = 'rgba(56,189,248,0.1)';
+    ctx.lineWidth = 1;
+    for (let fx = 0; fx < CW; fx += 20) {
+      ctx.beginPath(); ctx.moveTo(fx, FLOOR_Y); ctx.lineTo(fx + 10, FLOOR_Y + 8); ctx.stroke();
+    }
+
+    // wall
+    const wGrad = ctx.createLinearGradient(0, 0, WALL_W, 0);
+    wGrad.addColorStop(0, '#0a0e18');
+    wGrad.addColorStop(1, '#1e2e44');
+    ctx.fillStyle = wGrad;
+    ctx.fillRect(0, 0, WALL_W, FLOOR_Y);
+    ctx.strokeStyle = 'rgba(56,189,248,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(WALL_W, 0); ctx.lineTo(WALL_W, FLOOR_Y); ctx.stroke();
+    ctx.strokeStyle = 'rgba(56,189,248,0.12)';
+    ctx.lineWidth = 1;
+    for (let hy = 14; hy < FLOOR_Y; hy += 18) {
+      ctx.beginPath(); ctx.moveTo(2, hy); ctx.lineTo(WALL_W - 4, hy + 12); ctx.stroke();
+    }
+    // wall label
+    ctx.save();
+    ctx.translate(WALL_W - 10, FLOOR_Y / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = '8px IBM Plex Mono';
+    ctx.fillStyle = 'rgba(56,189,248,0.25)';
+    ctx.textAlign = 'center';
+    ctx.fillText('FIXED WALL', 0, 0);
+    ctx.restore();
+
+    // spring – colour encodes compression (orange) vs extension (cyan)
+    const springRight = bL;
+    const compressionRatio = x / A;  // -1 compressed, +1 extended
+    const springR = Math.max(0, Math.min(255, Math.round(compressionRatio < 0 ? 249 : 34)));
+    const springG = Math.max(0, Math.min(255, Math.round(compressionRatio < 0 ? 115 : 211)));
+    const springB = Math.max(0, Math.min(255, Math.round(compressionRatio < 0 ? 22  : 168)));
+    const alpha = 0.5 + Math.abs(compressionRatio) * 0.4;
+    ctx.save();
+    pathSpring(WALL_W, springRight, BLOCK_CY, 10, 13);
+    ctx.strokeStyle = `rgba(${springR},${springG},${springB},${alpha})`;
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = `rgba(${springR},${springG},${springB},0.5)`;
+    ctx.shadowBlur = 7;
+    ctx.stroke();
+    ctx.restore();
+
+    // block shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 20; ctx.shadowOffsetY = 8;
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.beginPath(); ctx.roundRect(bL, bT, BLOCK_W, BLOCK_H, 4); ctx.fill();
+    ctx.restore();
+
+    // block body
+    const blkGrad = ctx.createLinearGradient(bL, bT, bR, bT + BLOCK_H);
+    blkGrad.addColorStop(0, '#2a70b0');
+    blkGrad.addColorStop(0.5, '#1a4a72');
+    blkGrad.addColorStop(1, '#0e2840');
+    ctx.fillStyle = blkGrad;
+    ctx.strokeStyle = 'rgba(56,189,248,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(bL, bT, BLOCK_W, BLOCK_H, 4); ctx.fill(); ctx.stroke();
+    // shine
+    ctx.fillStyle = 'rgba(125,211,252,0.1)';
+    ctx.beginPath(); ctx.roundRect(bL+4, bT+4, BLOCK_W-8, 13, 2); ctx.fill();
+    // label
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 14px Syne, sans-serif';
+    ctx.fillStyle = 'rgba(125,211,252,0.92)';
+    ctx.fillText('m', bL + BLOCK_W/2, BLOCK_CY + 5);
+    ctx.font = '9px IBM Plex Mono';
+    ctx.fillStyle = 'rgba(90,150,180,0.8)';
+    ctx.fillText('10 kg', bL + BLOCK_W/2, BLOCK_CY + 19);
+
+    // wheels
+    [bL + 14, bR - 14].forEach(wx => {
+      const wGrad2 = ctx.createRadialGradient(wx-2, FLOOR_Y-2, 1, wx, FLOOR_Y, 8);
+      wGrad2.addColorStop(0, '#3a7a9a');
+      wGrad2.addColorStop(1, '#0e2030');
+      ctx.beginPath(); ctx.arc(wx, FLOOR_Y, 8, 0, Math.PI*2);
+      ctx.fillStyle = wGrad2; ctx.fill();
+      ctx.strokeStyle = 'rgba(56,189,248,0.4)'; ctx.lineWidth = 1; ctx.stroke();
+      // axle dot
+      ctx.beginPath(); ctx.arc(wx, FLOOR_Y, 2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(56,189,248,0.6)'; ctx.fill();
+    });
+
+    // spring label
+    const springMidX = (WALL_W + bL) / 2;
+    ctx.font = '9px IBM Plex Mono';
+    ctx.fillStyle = 'rgba(56,189,248,0.3)';
+    ctx.textAlign = 'center';
+    ctx.fillText('k = 1000π² N/m', springMidX, BLOCK_CY + BLOCK_H + 22);
+  }
+
+  // ── DOM handles ───────────────────────────
+  const rTime  = document.getElementById('rTime');
+  const rPos   = document.getElementById('rPos');
+  const rVel   = document.getElementById('rVel');
+  const rKE    = document.getElementById('rKE');
+  const rPE    = document.getElementById('rPE');
+  const rTot   = document.getElementById('rTot');
+  const bKEEl  = document.getElementById('bKE');
+  const bPEEl  = document.getElementById('bPE');
+  const bKENum = document.getElementById('bKENum');
+  const bPENum = document.getElementById('bPENum');
+
+  function updateUI(x, vel, ke, pe) {
+    rTime.textContent = t.toFixed(4) + ' s';
+    rPos.textContent  = (x >= 0 ? '+' : '') + x.toFixed(4) + ' m';
+    rVel.textContent  = (vel >= 0 ? '+' : '') + vel.toFixed(3) + ' m/s';
+    rKE.textContent   = ke.toFixed(3) + ' J';
+    rPE.textContent   = pe.toFixed(3) + ' J';
+    rTot.textContent  = (ke + pe).toFixed(3) + ' J';
+    const kePct = ke / E * 100;
+    const pePct = pe / E * 100;
+    bKEEl.style.width  = kePct.toFixed(1) + '%';
+    bPEEl.style.width  = pePct.toFixed(1) + '%';
+    bKENum.textContent = kePct.toFixed(1) + '%';
+    bPENum.textContent = pePct.toFixed(1) + '%';
+  }
+
+  // ── Loop ──────────────────────────────────
+  function loop(ts) {
+    if (!lastTS) lastTS = ts;
+    if (running) t += (ts - lastTS) / 1000;
+    lastTS = ts;
+
+    const x   = A * Math.cos(OM * t);
+    const vel = -A * OM * Math.sin(OM * t);
+    const ke  = 0.5 * m * vel * vel;
+    const pe  = 0.5 * k * x * x;
+
+    draw(x);
+    updateUI(x, vel, ke, pe);
+    requestAnimationFrame(loop);
+  }
+
+  // ── Controls ──────────────────────────────
+  const btnPlay   = document.getElementById('btnPlay');
+  const phaseDot  = document.getElementById('phaseDot');
+  const phaseText = document.getElementById('phaseText');
+
+  btnPlay.addEventListener('click', () => {
+    running = !running;
+    if (running) {
+      lastTS = null;
+      btnPlay.textContent = '⏸ Pause';
+      btnPlay.classList.remove('paused');
+      phaseDot.classList.remove('paused');
+      phaseText.textContent = 'OSCILLATING';
+    } else {
+      btnPlay.textContent = '▶ Play';
+      btnPlay.classList.add('paused');
+      phaseDot.classList.add('paused');
+      phaseText.textContent = 'PAUSED';
+    }
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    t = 0; lastTS = null; posTrail.length = 0;
+    if (!running) {
+      running = true;
+      btnPlay.textContent = '⏸ Pause';
+      btnPlay.classList.remove('paused');
+      phaseDot.classList.remove('paused');
+      phaseText.textContent = 'OSCILLATING';
+    }
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

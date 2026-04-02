@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Force and Potential Energy Visualization</title>
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --secondary: #38a169;
+            --accent: #ed8936;
+            --bg-color: #f7fafc;
+            --panel-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--panel-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            background: #edf2f7;
+            padding: 15px 20px;
+            border-radius: 8px;
+        }
+
+        .control-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            background: #ebf8ff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid #bee3f8;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: monospace;
+            color: var(--primary);
+            margin-top: 5px;
+        }
+
+        .plot-container {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        .plot-title {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.8);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        canvas {
+            width: 100%;
+            height: 300px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: block;
+            background: #ffffff;
+        }
+
+        .description {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Harmonic Oscillator: Force & Potential Energy</h1>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="x-slider">
+                <span>Current Position (x)</span>
+                <span id="x-label-val">0.00 m</span>
+            </label>
+            <input type="range" id="x-slider" min="-5" max="5" step="0.05" value="3.00">
+        </div>
+        <div class="control-group">
+            <label for="k-slider">
+                <span>Spring Constant (k)</span>
+                <span id="k-label-val">2.00 N/m</span>
+            </label>
+            <input type="range" id="k-slider" min="1" max="10" step="0.1" value="2.0">
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="stat-box">
+            <span class="stat-label">Position (x)</span>
+            <span class="stat-value" id="val-x">0.00</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Spring Const (k)</span>
+            <span class="stat-value" id="val-k">0.00</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Force F(x) = -kx</span>
+            <span class="stat-value" id="val-f" style="color: var(--primary);">0.00</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Energy U(x) = ½kx²</span>
+            <span class="stat-value" id="val-u" style="color: var(--secondary);">0.00</span>
+        </div>
+    </div>
+
+    <div class="plot-container">
+        <div class="plot-title" style="color: var(--primary);">Restoring Force vs. Position</div>
+        <canvas id="forceCanvas" width="1600" height="600"></canvas>
+    </div>
+
+    <div class="plot-container">
+        <div class="plot-title" style="color: var(--secondary);">Potential Energy vs. Position</div>
+        <canvas id="energyCanvas" width="1600" height="600"></canvas>
+    </div>
+
+    <p class="description">
+        <strong>Visual Integration:</strong> The orange shaded area under the Force curve from 0 to <em>x</em> represents the work done against the spring. 
+        The geometric area of this triangle equals exactly the Potential Energy <em>U(x)</em> stored in the spring at that position.
+    </p>
+</div>
+
+<script>
+    // Elements
+    const xSlider = document.getElementById('x-slider');
+    const kSlider = document.getElementById('k-slider');
+    
+    const xLabelVal = document.getElementById('x-label-val');
+    const kLabelVal = document.getElementById('k-label-val');
+    const valX = document.getElementById('val-x');
+    const valK = document.getElementById('val-k');
+    const valF = document.getElementById('val-f');
+    const valU = document.getElementById('val-u');
+
+    const canvasF = document.getElementById('forceCanvas');
+    const ctxF = canvasF.getContext('2d');
+    const canvasU = document.getElementById('energyCanvas');
+    const ctxU = canvasU.getContext('2d');
+
+    // Canvas settings (Higher resolution internal drawing, scaled via CSS)
+    const W = canvasF.width;
+    const H = canvasF.height;
+
+    // Mathematical coordinate bounds for mapping
+    const minX = -5.5, maxX = 5.5;
+    
+    // Y bounds for Force: Max k=10, Max x=5 -> F ranges from -50 to +50
+    const minY_F = -60, maxY_F = 60; 
+    
+    // Y bounds for Energy: Max k=10, Max x=5 -> U ranges from 0 to 125
+    const minY_U = -15, maxY_U = 135; 
+
+    // Mapping functions
+    function mapX(x) {
+        return ((x - minX) / (maxX - minX)) * W;
+    }
+
+    function mapY_F(y) {
+        return H - ((y - minY_F) / (maxY_F - minY_F)) * H;
+    }
+
+    function mapY_U(y) {
+        return H - ((y - minY_U) / (maxY_U - minY_U)) * H;
+    }
+
+    // Helper: Draw Grid and Axes
+    function drawGrid(ctx, mapYFunc, minY, maxY, yStep) {
+        ctx.clearRect(0, 0, W, H);
+        
+        ctx.lineWidth = 1;
+        ctx.font = '24px sans-serif';
+        ctx.fillStyle = '#a0aec0';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        // X-axis grid lines
+        for (let i = -5; i <= 5; i++) {
+            let px = mapX(i);
+            ctx.strokeStyle = i === 0 ? '#cbd5e0' : '#edf2f7';
+            ctx.beginPath();
+            ctx.moveTo(px, 0);
+            ctx.lineTo(px, H);
+            ctx.stroke();
+            
+            // X-axis labels
+            if (i !== 0) ctx.fillText(i, px, mapYFunc(0) + 10);
+        }
+
+        // Y-axis grid lines
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let i = Math.ceil(minY/yStep)*yStep; i <= maxY; i += yStep) {
+            let py = mapYFunc(i);
+            ctx.strokeStyle = i === 0 ? '#cbd5e0' : '#edf2f7';
+            ctx.beginPath();
+            ctx.moveTo(0, py);
+            ctx.lineTo(W, py);
+            ctx.stroke();
+            
+            // Y-axis labels
+            if (i !== 0) ctx.fillText(i, mapX(0) - 10, py);
+        }
+
+        // Draw main axes
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#4a5568';
+        
+        // X axis
+        ctx.beginPath();
+        ctx.moveTo(0, mapYFunc(0));
+        ctx.lineTo(W, mapYFunc(0));
+        ctx.stroke();
+        
+        // Y axis
+        ctx.beginPath();
+        ctx.moveTo(mapX(0), 0);
+        ctx.lineTo(mapX(0), H);
+        ctx.stroke();
+    }
+
+    // Draw the Force plot
+    function drawForcePlot(x_curr, k_curr) {
+        drawGrid(ctxF, mapY_F, minY_F, maxY_F, 20);
+
+        // 1. Draw Force Line F(x) = -kx
+        ctxF.lineWidth = 5;
+        ctxF.strokeStyle = '#2b6cb0'; // Primary Blue
+        ctxF.beginPath();
+        ctxF.moveTo(mapX(-5.5), mapY_F(-k_curr * -5.5));
+        ctxF.lineTo(mapX(5.5), mapY_F(-k_curr * 5.5));
+        ctxF.stroke();
+
+        let currentF = -k_curr * x_curr;
+
+        // 2. Shade Area (Integration / Work done)
+        if (x_curr !== 0) {
+            ctxF.fillStyle = 'rgba(237, 137, 54, 0.4)'; // Orange accent with transparency
+            ctxF.beginPath();
+            ctxF.moveTo(mapX(0), mapY_F(0));
+            ctxF.lineTo(mapX(x_curr), mapY_F(0));
+            ctxF.lineTo(mapX(x_curr), mapY_F(currentF));
+            ctxF.closePath();
+            ctxF.fill();
+
+            // Label the area
+            let areaVal = 0.5 * k_curr * x_curr * x_curr;
+            let midX = mapX(x_curr / 2);
+            let midY = mapY_F(currentF / 3);
+            ctxF.fillStyle = '#dd6b20';
+            ctxF.font = 'bold 26px sans-serif';
+            ctxF.textAlign = x_curr > 0 ? 'right' : 'left';
+            let offsetX = x_curr > 0 ? -15 : 15;
+            ctxF.fillText(`Area = ${areaVal.toFixed(1)} J`, midX + offsetX, midY);
+        }
+
+        // 3. Draw Marker Guide Line
+        ctxF.setLineDash([10, 10]);
+        ctxF.lineWidth = 3;
+        ctxF.strokeStyle = '#718096';
+        ctxF.beginPath();
+        ctxF.moveTo(mapX(x_curr), mapY_F(0));
+        ctxF.lineTo(mapX(x_curr), mapY_F(currentF));
+        ctxF.stroke();
+        ctxF.setLineDash([]); // Reset
+
+        // 4. Draw Marker Dot
+        ctxF.fillStyle = '#ed8936'; // Orange accent to match area
+        ctxF.beginPath();
+        ctxF.arc(mapX(x_curr), mapY_F(currentF), 10, 0, Math.PI * 2);
+        ctxF.fill();
+        ctxF.strokeStyle = '#fff';
+        ctxF.lineWidth = 3;
+        ctxF.stroke();
+    }
+
+    // Draw the Energy plot
+    function drawEnergyPlot(x_curr, k_curr) {
+        drawGrid(ctxU, mapY_U, minY_U, maxY_U, 25);
+
+        // 1. Draw Parabola U(x) = 0.5 * k * x^2
+        ctxU.lineWidth = 5;
+        ctxU.strokeStyle = '#38a169'; // Secondary Green
+        ctxU.beginPath();
+        for (let i = -5.5; i <= 5.5; i += 0.1) {
+            let px = mapX(i);
+            let py = mapY_U(0.5 * k_curr * i * i);
+            if (i === -5.5) ctxU.moveTo(px, py);
+            else ctxU.lineTo(px, py);
+        }
+        ctxU.stroke();
+
+        let currentU = 0.5 * k_curr * x_curr * x_curr;
+
+        // 2. Draw Marker Guide Line
+        ctxU.setLineDash([10, 10]);
+        ctxU.lineWidth = 3;
+        ctxU.strokeStyle = '#718096';
+        ctxU.beginPath();
+        ctxU.moveTo(mapX(x_curr), mapY_U(0));
+        ctxU.lineTo(mapX(x_curr), mapY_U(currentU));
+        ctxU.stroke();
+        
+        // Link visually to Force plot
+        ctxU.beginPath();
+        ctxU.moveTo(mapX(0), mapY_U(currentU));
+        ctxU.lineTo(mapX(x_curr), mapY_U(currentU));
+        ctxU.strokeStyle = 'rgba(237, 137, 54, 0.5)'; // Orange dotted line to y-axis
+        ctxU.stroke();
+        ctxU.setLineDash([]);
+
+        // 3. Draw Marker Dot
+        ctxU.fillStyle = '#ed8936'; // Match area color
+        ctxU.beginPath();
+        ctxU.arc(mapX(x_curr), mapY_U(currentU), 10, 0, Math.PI * 2);
+        ctxU.fill();
+        ctxU.strokeStyle = '#fff';
+        ctxU.lineWidth = 3;
+        ctxU.stroke();
+    }
+
+    // Main Update Loop
+    function updateVisualization() {
+        let x = parseFloat(xSlider.value);
+        let k = parseFloat(kSlider.value);
+        
+        let f = -k * x;
+        let u = 0.5 * k * x * x;
+
+        // Update DOM texts
+        xLabelVal.textContent = x.toFixed(2) + ' m';
+        kLabelVal.textContent = k.toFixed(2) + ' N/m';
+        valX.textContent = x.toFixed(2);
+        valK.textContent = k.toFixed(2);
+        valF.textContent = f.toFixed(2);
+        valU.textContent = u.toFixed(2);
+
+        // Draw Canvas
+        drawForcePlot(x, k);
+        drawEnergyPlot(x, k);
+    }
+
+    // Event Listeners
+    xSlider.addEventListener('input', updateVisualization);
+    kSlider.addEventListener('input', updateVisualization);
+
+    // Initial render
+    updateVisualization();
+
+</script>
+</body>
+</html>
