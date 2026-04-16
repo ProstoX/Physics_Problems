@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Principle of Superposition: Standing Waves</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --text-color: #333;
+            --wave1-color: #3498db; /* Blue for Right-traveling */
+            --wave2-color: #e74c3c; /* Red for Left-traveling */
+            --result-color: #8e44ad; /* Purple for Resultant */
+            --node-color: #2c3e50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        p.description {
+            text-align: center;
+            max-width: 800px;
+            margin-bottom: 20px;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        canvas {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            width: 100%;
+            max-width: 800px;
+            height: 400px;
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            padding: 10px 15px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .toggle-group:hover {
+            background: #e9ecef;
+        }
+
+        /* Colored indicators for checkboxes */
+        .color-box {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .w1-box { background-color: var(--wave1-color); }
+        .w2-box { background-color: var(--wave2-color); }
+        .res-box { background-color: var(--result-color); }
+
+        input[type="checkbox"] {
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Wave Superposition Visualizer</h1>
+    <p class="description">
+        Observe how two identical waves traveling in opposite directions combine to form a standing wave. 
+        Toggle the checkboxes to view the individual traveling waves and their resultant sum.
+    </p>
+
+    <div class="container">
+        <canvas id="waveCanvas" width="800" height="400"></canvas>
+
+        <div class="controls">
+            <label class="toggle-group">
+                <input type="checkbox" id="showWave1" checked>
+                <span class="color-box w1-box"></span>
+                Wave 1 (Right)
+            </label>
+            
+            <label class="toggle-group">
+                <input type="checkbox" id="showWave2" checked>
+                <span class="color-box w2-box"></span>
+                Wave 2 (Left)
+            </label>
+            
+            <label class="toggle-group">
+                <input type="checkbox" id="showResultant" checked>
+                <span class="color-box res-box"></span>
+                Resultant Wave
+            </label>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Physics Parameters
+        const amplitude = 50;           // A
+        const wavelength = 200;         // lambda
+        const k = (2 * Math.PI) / wavelength; // wave number
+        const omega = 0.05;             // angular frequency
+        let time = 0;
+
+        // UI Elements
+        const cbWave1 = document.getElementById('showWave1');
+        const cbWave2 = document.getElementById('showWave2');
+        const cbResultant = document.getElementById('showResultant');
+
+        // Canvas styling coordinates
+        const centerY = canvas.height / 2;
+        const width = canvas.width;
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw center axis
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(width, centerY);
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Retrieve checkbox states
+            const showW1 = cbWave1.checked;
+            const showW2 = cbWave2.checked;
+            const showRes = cbResultant.checked;
+
+            ctx.lineJoin = 'round';
+
+            // Draw Wave 1 (Traveling Right: y1 = A * sin(kx - wt))
+            if (showW1) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(52, 152, 219, 0.7)'; // Blue
+                ctx.lineWidth = 2;
+                for (let x = 0; x <= width; x++) {
+                    const y1 = amplitude * Math.sin(k * x - omega * time);
+                    ctx.lineTo(x, centerY - y1); // Subtract y to draw "up" physically
+                }
+                ctx.stroke();
+            }
+
+            // Draw Wave 2 (Traveling Left: y2 = A * sin(kx + wt))
+            if (showW2) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(231, 76, 60, 0.7)'; // Red
+                ctx.lineWidth = 2;
+                for (let x = 0; x <= width; x++) {
+                    const y2 = amplitude * Math.sin(k * x + omega * time);
+                    ctx.lineTo(x, centerY - y2);
+                }
+                ctx.stroke();
+            }
+
+            // Draw Resultant Wave (Standing Wave: y = y1 + y2 = 2A * sin(kx) * cos(wt))
+            if (showRes) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#8e44ad'; // Purple
+                ctx.lineWidth = 4;
+                for (let x = 0; x <= width; x++) {
+                    // Using the superposition principle natively
+                    const y1 = amplitude * Math.sin(k * x - omega * time);
+                    const y2 = amplitude * Math.sin(k * x + omega * time);
+                    const yRes = y1 + y2; 
+                    ctx.lineTo(x, centerY - yRes);
+                }
+                ctx.stroke();
+
+                // Draw Nodes
+                drawNodes();
+            }
+
+            // Advance time and loop
+            time += 1;
+            requestAnimationFrame(draw);
+        }
+
+        function drawNodes() {
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '12px Segoe UI';
+            ctx.textAlign = 'center';
+
+            // Nodes occur where sin(kx) = 0 -> kx = n*pi -> x = n * lambda / 2
+            const nodeSpacing = wavelength / 2;
+            
+            for (let x = 0; x <= width; x += nodeSpacing) {
+                // Draw the dot
+                ctx.beginPath();
+                ctx.arc(x, centerY, 5, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Draw the label slightly below or above the axis
+                ctx.fillText('Node', x, centerY + 20);
+            }
+        }
+
+        // Start animation
+        draw();
+    </script>
+
+</body>
+</html>

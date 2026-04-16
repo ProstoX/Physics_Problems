@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traveling Wave Simulation</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-hover: #2980b9;
+            --text-dark: #2c3e50;
+            --bg-color: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+            color: var(--text-dark);
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            background: #eef2f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .stat-box {
+            text-align: center;
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #e74c3c;
+        }
+
+        /* Canvas Graph */
+        .graph-container {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 350px;
+            background-color: #fff;
+            background-image:
+                linear-gradient(#e5e7eb 1px, transparent 1px),
+                linear-gradient(90deg, #e5e7eb 1px, transparent 1px);
+            background-size: 50px 50px;
+            background-position: center center;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .axis-label {
+            position: absolute;
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+        .y-max { top: 10px; left: 10px; }
+        .y-min { bottom: 10px; left: 10px; }
+        .x-max { bottom: -25px; right: 0; }
+        .x-min { bottom: -25px; left: 0; }
+
+        /* Controls */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            background: #fff;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: #444;
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .btn-container {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Traveling Wave Simulator</h2>
+
+    <div class="dashboard">
+        <div class="stat-box">
+            <div class="stat-label">Amplitude (A)</div>
+            <div class="stat-value" id="valA">0.05 m</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Wavelength (&lambda;)</div>
+            <div class="stat-value" id="valLambda">1.00 m</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Frequency (f)</div>
+            <div class="stat-value" id="valFreq">25.0 Hz</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Wave Speed (v)</div>
+            <div class="stat-value" id="valSpeed">25.0 m/s</div>
+        </div>
+    </div>
+
+    <div class="graph-container">
+        <span class="axis-label y-max">0.1 m</span>
+        <span class="axis-label y-min">-0.1 m</span>
+        <canvas id="waveCanvas" width="840" height="350"></canvas>
+        <span class="axis-label x-min">0 m</span>
+        <span class="axis-label x-max">3 m</span>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="sliderA">
+                <span>Amplitude (A)</span>
+                <span id="labelA">0.05 m</span>
+            </label>
+            <input type="range" id="sliderA" min="0.01" max="0.10" step="0.01" value="0.05">
+        </div>
+        
+        <div class="control-group">
+            <label for="sliderK">
+                <span>Wavenumber (k)</span>
+                <span><span id="labelK">2</span>&pi; rad/m</span>
+            </label>
+            <input type="range" id="sliderK" min="1" max="4" step="0.1" value="2">
+        </div>
+
+        <div class="control-group">
+            <label for="sliderW">
+                <span>Angular Freq (&omega;)</span>
+                <span><span id="labelW">50</span>&pi; rad/s</span>
+            </label>
+            <input type="range" id="sliderW" min="10" max="100" step="1" value="50">
+        </div>
+
+        <div class="btn-container">
+            <button id="playBtn">Pause</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Control Elements
+    const sliderA = document.getElementById('sliderA');
+    const sliderK = document.getElementById('sliderK');
+    const sliderW = document.getElementById('sliderW');
+    const playBtn = document.getElementById('playBtn');
+
+    // UI Labels
+    const labelA = document.getElementById('labelA');
+    const labelK = document.getElementById('labelK');
+    const labelW = document.getElementById('labelW');
+
+    // Dashboard Elements
+    const valA = document.getElementById('valA');
+    const valLambda = document.getElementById('valLambda');
+    const valFreq = document.getElementById('valFreq');
+    const valSpeed = document.getElementById('valSpeed');
+
+    // Physics Variables
+    let A = parseFloat(sliderA.value);
+    let k_coeff = parseFloat(sliderK.value);
+    let w_coeff = parseFloat(sliderW.value);
+    let k = k_coeff * Math.PI;
+    let omega = w_coeff * Math.PI;
+
+    // Animation Variables
+    let time = 0;
+    let isPlaying = true;
+    let lastTimestamp = performance.now();
+
+    function updatePhysics() {
+        // Read Sliders
+        A = parseFloat(sliderA.value);
+        k_coeff = parseFloat(sliderK.value);
+        w_coeff = parseFloat(sliderW.value);
+
+        // Apply Pi math
+        k = k_coeff * Math.PI;
+        omega = w_coeff * Math.PI;
+
+        // Update Slider Labels
+        labelA.textContent = A.toFixed(2) + " m";
+        labelK.textContent = k_coeff.toFixed(1);
+        labelW.textContent = w_coeff.toFixed(0);
+
+        // Calculate Derived Values: Wavelength (2pi/k), Frequency (w/2pi), Speed (w/k)
+        let lambda = (2 * Math.PI) / k;
+        let freq = omega / (2 * Math.PI);
+        let speed = omega / k;
+
+        // Update Dashboard
+        valA.textContent = A.toFixed(2) + " m";
+        valLambda.textContent = lambda.toFixed(2) + " m";
+        valFreq.textContent = freq.toFixed(1) + " Hz";
+        valSpeed.textContent = speed.toFixed(1) + " m/s";
+        
+        // Redraw immediately if paused
+        if (!isPlaying) drawWave();
+    }
+
+    // Attach Listeners
+    [sliderA, sliderK, sliderW].forEach(slider => {
+        slider.addEventListener('input', updatePhysics);
+    });
+
+    playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        playBtn.textContent = isPlaying ? "Pause" : "Play";
+        if (isPlaying) {
+            lastTimestamp = performance.now();
+            animate();
+        }
+    });
+
+    function drawWave() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw horizontal center axis
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Canvas scaling constraints
+        const physicalXMax = 3.0; // 0 to 3 meters
+        const physicalYMax = 0.1; // -0.1 to 0.1 meters
+        const midY = canvas.height / 2;
+
+        ctx.beginPath();
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 3;
+
+        for (let px = 0; px <= canvas.width; px++) {
+            // Map pixel X to physical X (0 to 3m)
+            let x = (px / canvas.width) * physicalXMax;
+            
+            // Calculate physical Y using y(x,t) = A * sin(kx - wt)
+            let y = A * Math.sin(k * x - omega * time);
+
+            // Map physical Y to pixel Y
+            let py = midY - (y / physicalYMax) * midY;
+
+            if (px === 0) {
+                ctx.moveTo(px, py);
+            } else {
+                ctx.lineTo(px, py);
+            }
+        }
+        ctx.stroke();
+    }
+
+    function animate(timestamp) {
+        if (!isPlaying) return;
+
+        // Calculate delta time in seconds
+        let dt = (timestamp - lastTimestamp) / 1000 || 0;
+        time += dt;
+        lastTimestamp = timestamp;
+
+        drawWave();
+        requestAnimationFrame(animate);
+    }
+
+    // Initialize
+    updatePhysics();
+    requestAnimationFrame((timestamp) => {
+        lastTimestamp = timestamp;
+        animate(timestamp);
+    });
+
+</script>
+</body>
+</html>

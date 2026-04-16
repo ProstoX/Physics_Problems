@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Interference & Superposition Simulator</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .controls {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 900px;
+            justify-content: center;
+            align-items: center;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 140px;
+        }
+        label { margin-bottom: 8px; font-size: 0.9em; }
+        input[type="range"] { accent-color: #0f3460; cursor: pointer; }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            padding-top: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            background: #e94560;
+            color: white;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background: #d03050; }
+        .status { font-weight: bold; font-size: 1.1em; color: #4ecca3; }
+        
+        /* Internal resolution is 400x400 for performance,
+           but CSS scales it up to 600x600 for visibility.
+        */
+        canvas {
+            background: #000;
+            cursor: crosshair;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border-radius: 4px;
+            image-rendering: pixelated; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="amp">Amplitude (A): <span id="amp-val">1.0</span></label>
+            <input type="range" id="amp" min="0.1" max="5" step="0.1" value="1">
+        </div>
+        <div class="control-group">
+            <label for="k">Wavenumber (k): <span id="k-val">2.0</span></label>
+            <input type="range" id="k" min="0.5" max="10" step="0.1" value="2">
+        </div>
+        <div class="control-group">
+            <label for="w">Angular Freq (w): <span id="w-val">3.0</span></label>
+            <input type="range" id="w" min="1" max="20" step="0.5" value="3">
+        </div>
+        <div class="control-group">
+            <label for="alpha">Attenuation (α): <span id="alpha-val">1.0</span></label>
+            <input type="range" id="alpha" min="0" max="2" step="0.1" value="1">
+        </div>
+        
+        <div class="buttons">
+            <button id="btn-play">Pause</button>
+            <button id="btn-reset">Reset (t=0)</button>
+            <button id="btn-clear">Clear All Sources</button>
+        </div>
+
+        <div class="control-group status">
+            Active Sources: <span id="source-count">1</span>
+        </div>
+    </div>
+
+    <canvas id="simCanvas" width="400" height="400" style="width: 600px; height: 600px;"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Simulation State
+        let sources = [{x: width / 2, y: height / 2}];
+        let t = 0;
+        let playing = true;
+        let lastFrameTime = performance.now();
+
+        // Wave Parameters
+        let A = 1.0, k = 2.0, w = 3.0, alpha = 1.0;
+
+        // UI Element References
+        const els = {
+            amp: document.getElementById('amp'),
+            k: document.getElementById('k'),
+            w: document.getElementById('w'),
+            alpha: document.getElementById('alpha'),
+            ampVal: document.getElementById('amp-val'),
+            kVal: document.getElementById('k-val'),
+            wVal: document.getElementById('w-val'),
+            alphaVal: document.getElementById('alpha-val'),
+            btnPlay: document.getElementById('btn-play'),
+            btnReset: document.getElementById('btn-reset'),
+            btnClear: document.getElementById('btn-clear'),
+            count: document.getElementById('source-count')
+        };
+
+        // Sync inputs to simulation state
+        function updateParams() {
+            A = parseFloat(els.amp.value);
+            k = parseFloat(els.k.value);
+            w = parseFloat(els.w.value);
+            alpha = parseFloat(els.alpha.value);
+            
+            els.ampVal.innerText = A.toFixed(1);
+            els.kVal.innerText = k.toFixed(1);
+            els.wVal.innerText = w.toFixed(1);
+            els.alphaVal.innerText = alpha.toFixed(1);
+        }
+
+        [els.amp, els.k, els.w, els.alpha].forEach(el => el.addEventListener('input', updateParams));
+
+        // Interaction Logic
+        els.btnPlay.addEventListener('click', () => {
+            playing = !playing;
+            els.btnPlay.innerText = playing ? 'Pause' : 'Play';
+            if (playing) {
+                lastFrameTime = performance.now();
+                requestAnimationFrame(render);
+            }
+        });
+
+        els.btnReset.addEventListener('click', () => {
+            t = 0;
+            if (!playing) render(performance.now(), true);
+        });
+
+        els.btnClear.addEventListener('click', () => {
+            sources = [];
+            els.count.innerText = '0';
+            if (!playing) render(performance.now(), true);
+        });
+
+        // Add point source on canvas click
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            // Scale mouse coordinates to match the internal canvas resolution
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            sources.push({x, y});
+            els.count.innerText = sources.length;
+            if (!playing) render(performance.now(), true);
+        });
+
+        // Main Rendering Loop
+        function render(currentTime, forceRender = false) {
+            if (!playing && !forceRender) return;
+
+            const deltaTime = (currentTime - lastFrameTime) / 1000;
+            lastFrameTime = currentTime;
+            
+            if (playing) t += deltaTime;
+
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            const wt = w * t;
+
+            // Compute displacement for every pixel
+            for (let py = 0; py < height; py++) {
+                for (let px = 0; px < width; px++) {
+                    let totalDisplacement = 0;
+
+                    for (let i = 0; i < sources.length; i++) {
+                        const src = sources[i];
+                        const dx = px - src.x;
+                        const dy = py - src.y;
+                        
+                        // Calculate distance (scaled down visually)
+                        const r = Math.sqrt(dx*dx + dy*dy) * 0.05; 
+                        
+                        // Attenuation (r+1 prevents division by zero at the exact source center)
+                        const decay = Math.pow(r + 1, alpha);
+                        
+                        // Wave Equation: y = (A / r^a) * cos(kr - wt)
+                        totalDisplacement += (A / decay) * Math.cos(k * r - wt);
+                    }
+
+                    // Map displacement to a grayscale intensity (128 is baseline/destructive)
+                    let intensity = 128 + (totalDisplacement * 40); 
+                    
+                    // Clamp values to valid RGB range [0, 255]
+                    if (intensity > 255) intensity = 255;
+                    if (intensity < 0) intensity = 0;
+
+                    const pixelIndex = (py * width + px) * 4;
+                    
+                    // Assign a slightly blue-tinted grayscale map
+                    data[pixelIndex] = intensity;           // Red
+                    data[pixelIndex + 1] = intensity;       // Green
+                    data[pixelIndex + 2] = intensity + 30;  // Blue (Tint)
+                    data[pixelIndex + 3] = 255;             // Alpha (Opaque)
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            // Render visible markers for the point sources
+            ctx.fillStyle = '#e94560';
+            for (let i = 0; i < sources.length; i++) {
+                ctx.beginPath();
+                ctx.arc(sources[i].x, sources[i].y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                // Optional: white stroke for better visibility
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            if (playing) {
+                requestAnimationFrame(render);
+            }
+        }
+
+        // Initialize and Start
+        updateParams();
+        requestAnimationFrame(render);
+
+    </script>
+</body>
+</html>

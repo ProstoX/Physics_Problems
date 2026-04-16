@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Young's Double Slit Interference</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .controls {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 30px;
+            width: 100%;
+            max-width: 560px;
+            justify-content: center;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 50%;
+        }
+        label {
+            margin-bottom: 10px;
+            font-size: 0.95em;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #4CAF50;
+        }
+        .canvas-container {
+            position: relative;
+            background: #808080; /* Base gray for zero amplitude */
+            border-radius: 4px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        canvas {
+            /* Scale up the internal 300x300 resolution for performance */
+            width: 600px; 
+            height: 600px;
+            display: block;
+            image-rendering: pixelated; /* Keeps the pixel math sharp */
+        }
+        .slit-marker {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #ff5722;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px #ff5722;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="slit-distance">Slit Distance (d): <span id="d-val">60</span></label>
+            <input type="range" id="slit-distance" min="10" max="150" step="1" value="60">
+        </div>
+        <div class="control-group">
+            <label for="wavelength">Wavelength (&lambda;): <span id="lambda-val">15</span></label>
+            <input type="range" id="wavelength" min="5" max="50" step="0.5" value="15">
+        </div>
+    </div>
+
+    <div class="canvas-container" id="container">
+        <canvas id="simCanvas" width="300" height="300"></canvas>
+        <div id="marker1" class="slit-marker"></div>
+        <div id="marker2" class="slit-marker"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // Internal Simulation Parameters
+        let d = 60;          // Slit separation
+        let lambda = 15;     // Wavelength
+        let k = (2 * Math.PI) / lambda; // Wavenumber
+        let w = 5.0;         // Angular frequency
+        let A = 800;         // Base Amplitude scaling factor for visibility
+        let t = 0;           // Time
+        
+        // DOM Elements
+        const dSlider = document.getElementById('slit-distance');
+        const lambdaSlider = document.getElementById('wavelength');
+        const dVal = document.getElementById('d-val');
+        const lambdaVal = document.getElementById('lambda-val');
+        const marker1 = document.getElementById('marker1');
+        const marker2 = document.getElementById('marker2');
+
+        // Slit Positions (Y is near the top edge)
+        const slitY = 10;
+        
+        function updateParams() {
+            d = parseFloat(dSlider.value);
+            lambda = parseFloat(lambdaSlider.value);
+            
+            dVal.innerText = d;
+            lambdaVal.innerText = lambda;
+            k = (2 * Math.PI) / lambda;
+            
+            // Update visual markers to overlay exactly where the calculation sources are.
+            // (Multiplied by 2 because CSS width is 600px and canvas width is 300px)
+            const centerX = 600 / 2;
+            const scaledD = d * 2;
+            const scaledY = slitY * 2;
+            
+            marker1.style.left = `${centerX - scaledD / 2}px`;
+            marker1.style.top = `${scaledY}px`;
+            
+            marker2.style.left = `${centerX + scaledD / 2}px`;
+            marker2.style.top = `${scaledY}px`;
+        }
+
+        dSlider.addEventListener('input', updateParams);
+        lambdaSlider.addEventListener('input', updateParams);
+
+        let lastTime = performance.now();
+
+        function render(currentTime) {
+            // Calculate delta time to ensure consistent animation speed regardless of frame rate
+            const dt = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            t += dt;
+
+            // Slit coordinates on the internal 300x300 canvas
+            const s1x = width / 2 - d / 2;
+            const s2x = width / 2 + d / 2;
+            const sy = slitY;
+
+            // Create an ImageData object to manipulate pixels directly
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            
+            // Pre-calculate time component
+            const wt = w * t;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    
+                    // Distance to Slit 1
+                    let dx1 = x - s1x;
+                    let dy1 = y - sy;
+                    let r1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+                    
+                    // Distance to Slit 2
+                    let dx2 = x - s2x;
+                    let dy2 = y - sy;
+                    let r2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+                    // Prevent division by zero near the exact slit coordinate
+                    if (r1 < 1) r1 = 1;
+                    if (r2 < 1) r2 = 1;
+
+                    // Wave Equation: u(r,t) = (A/r1)*sin(k*r1 - w*t) + (A/r2)*sin(k*r2 - w*t)
+                    const u1 = (A / r1) * Math.sin(k * r1 - wt);
+                    const u2 = (A / r2) * Math.sin(k * r2 - wt);
+                    const uTotal = u1 + u2;
+
+                    // Map displacement to a grayscale value [0, 255]
+                    // 128 is baseline (zero displacement = gray)
+                    // High peaks -> White (255), Deep troughs -> Black (0)
+                    let color = 128 + uTotal;
+
+                    // Clamp values
+                    if (color > 255) color = 255;
+                    else if (color < 0) color = 0;
+
+                    const index = (y * width + x) * 4;
+                    data[index] = color;     // Red
+                    data[index + 1] = color; // Green
+                    data[index + 2] = color; // Blue
+                    data[index + 3] = 255;   // Alpha
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            requestAnimationFrame(render);
+        }
+
+        // Initialize and start loop
+        updateParams();
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>

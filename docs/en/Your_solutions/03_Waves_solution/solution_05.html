@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echo Ranging Physics Simulation</title>
+    <style>
+        /* Modern, clean reset and base styling */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f4f8;
+            padding: 40px 20px;
+            color: #333;
+        }
+
+        /* Head-Up Display (HUD) for stats and timer */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            width: 700px;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+
+        .info-panel {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            flex: 1;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .timer-panel {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timer {
+            font-size: 2.5rem;
+            font-family: "Courier New", Courier, monospace;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* The 2D Scene Container */
+        .scene {
+            position: relative;
+            width: 700px;
+            height: 350px;
+            background: linear-gradient(to bottom, #a1c4fd 0%, #c2e9fb 100%);
+            border-radius: 12px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 25%;
+            background: #81c784;
+            border-top: 4px solid #66bb6a;
+        }
+
+        /* Actors: Person and Cliff */
+        .person {
+            position: absolute;
+            bottom: 25%;
+            left: 50px;
+            font-size: 60px;
+            line-height: 1;
+            transform: translateY(15%);
+            z-index: 2;
+        }
+
+        .cliff {
+            position: absolute;
+            bottom: 25%;
+            right: 50px;
+            width: 80px;
+            height: 220px;
+            background: #78909c;
+            border-radius: 8px 8px 0 0;
+            border-left: 4px solid #607d8b;
+            z-index: 2;
+        }
+
+        /* Distance Indicator */
+        .distance-line {
+            position: absolute;
+            bottom: 12%;
+            left: 80px;
+            width: 480px; /* Spans from person to cliff */
+            border-bottom: 2px dashed #333;
+            text-align: center;
+            z-index: 2;
+        }
+
+        .distance-line span {
+            position: relative;
+            top: 10px;
+            background: #81c784;
+            padding: 0 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #1b5e20;
+        }
+
+        /* The Sound Wave */
+        .wave {
+            position: absolute;
+            bottom: 40%;
+            left: 80px; /* Starting position */
+            width: 30px;
+            height: 60px;
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 3;
+        }
+
+        /* Outgoing style */
+        .wave.outgoing {
+            border-right: 6px solid #2980b9;
+            border-left: none;
+        }
+
+        /* Returning style (color change) */
+        .wave.returning {
+            border-left: 6px solid #e74c3c;
+            border-right: none;
+        }
+
+        /* Status Message */
+        .message {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        /* Controls */
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hud">
+        <div class="info-panel">
+            <strong>Speed of sound (v):</strong> 343 m/s<br>
+            <strong>Distance to cliff (d):</strong> 171.5 m
+        </div>
+        <div class="timer-panel">
+            <div class="timer" id="timerDisplay">0.00 s</div>
+        </div>
+    </div>
+
+    <div class="scene">
+        <div class="ground"></div>
+        <div class="person">🗣️</div>
+        <div class="cliff"></div>
+        <div class="distance-line"><span>d = 171.5 m</span></div>
+        <div class="wave" id="soundWave"></div>
+        <div class="message" id="echoMessage">Echo Heard! Total time: 1.00 second.</div>
+    </div>
+
+    <button id="shoutButton">Shout!</button>
+
+    <script>
+        const shoutButton = document.getElementById('shoutButton');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const soundWave = document.getElementById('soundWave');
+        const echoMessage = document.getElementById('echoMessage');
+        
+        let startTimestamp = null;
+        let animationFrameId = null;
+        
+        // Configuration for the exact physics timing
+        const totalDurationMs = 1000;         // 1.00 seconds total
+        const impactTimeMs = totalDurationMs / 2; // 0.50 seconds to hit cliff
+        
+        // Pixel boundaries for the animation (tuned to the CSS layout)
+        const startX = 80;  // Person's mouth roughly
+        const endX = 560;   // Left face of the cliff
+
+        function animatePhysics(timestamp) {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const elapsed = timestamp - startTimestamp;
+            
+            if (elapsed < totalDurationMs) {
+                // 1. Update the timer format to '0.00 s'
+                timerDisplay.textContent = (elapsed / 1000).toFixed(2) + ' s';
+                
+                // 2. Animate the sound wave based on elapsed time
+                if (elapsed <= impactTimeMs) {
+                    // Stage 1: Wave traveling OUT to the cliff (0 to 0.50s)
+                    const progress = elapsed / impactTimeMs;
+                    const currentX = startX + (endX - startX) * progress;
+                    
+                    soundWave.style.opacity = 1;
+                    soundWave.style.left = currentX + 'px';
+                    
+                    // Ensure outgoing CSS class is active
+                    if (!soundWave.classList.contains('outgoing')) {
+                        soundWave.className = 'wave outgoing';
+                    }
+                } else {
+                    // Stage 2: Wave bouncing BACK to the person (0.50s to 1.00s)
+                    const progress = (elapsed - impactTimeMs) / impactTimeMs;
+                    const currentX = endX - (endX - startX) * progress;
+                    
+                    soundWave.style.left = currentX + 'px';
+                    
+                    // Switch to returning CSS class (changes color/direction)
+                    if (!soundWave.classList.contains('returning')) {
+                        soundWave.className = 'wave returning';
+                    }
+                }
+                
+                // Request the next frame
+                animationFrameId = requestAnimationFrame(animatePhysics);
+            } else {
+                // 3. Animation Complete (exactly 1.00s)
+                timerDisplay.textContent = '1.00 s';
+                soundWave.style.opacity = 0;
+                echoMessage.style.opacity = 1; // Flash the success message
+                
+                // Reset state after a brief delay
+                setTimeout(() => {
+                    echoMessage.style.opacity = 0;
+                    shoutButton.disabled = false;
+                    shoutButton.textContent = "Shout Again!";
+                }, 2500);
+            }
+        }
+        
+        shoutButton.addEventListener('click', () => {
+            // Lock UI and reset parameters for a fresh start
+            shoutButton.disabled = true;
+            echoMessage.style.opacity = 0;
+            timerDisplay.textContent = '0.00 s';
+            startTimestamp = null;
+            
+            // Setup the initial wave state
+            soundWave.className = 'wave outgoing';
+            soundWave.style.opacity = 1;
+            soundWave.style.left = startX + 'px';
+            
+            // Kick off the animation loop
+            animationFrameId = requestAnimationFrame(animatePhysics);
+        });
+    </script>
+</body>
+</html>

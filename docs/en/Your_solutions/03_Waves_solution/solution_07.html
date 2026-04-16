@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Standing Wave Visualization</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f0f4f8;
+        margin: 0;
+        padding: 40px 20px;
+        color: #2d3748;
+    }
+    .container {
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        text-align: center;
+        max-width: 900px;
+        width: 100%;
+    }
+    h2 {
+        margin-top: 0;
+        color: #1a202c;
+    }
+    canvas {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background-color: #fafbfc;
+        margin-bottom: 25px;
+        max-width: 100%;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .controls {
+        margin-bottom: 25px;
+        font-size: 1.1em;
+        font-weight: 500;
+    }
+    input[type="range"] {
+        width: 300px;
+        max-width: 80%;
+        margin-top: 10px;
+        accent-color: #3182ce;
+    }
+    .readout {
+        font-size: 1.15em;
+        background: #edf2f7;
+        padding: 20px;
+        border-radius: 8px;
+        display: inline-block;
+        min-width: 300px;
+        border: 1px solid #e2e8f0;
+    }
+    .readout div {
+        margin-bottom: 8px;
+    }
+    .formula {
+        font-family: 'Fira Code', 'Courier New', Courier, monospace;
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #2b6cb0;
+        margin-top: 15px !important;
+        background: #e2e8f0;
+        padding: 10px;
+        border-radius: 6px;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Standing Wave on a String</h2>
+    <canvas id="waveCanvas" width="800" height="300"></canvas>
+    
+    <div class="controls">
+        <label for="n-slider">Number of Antinodes (n): <span id="n-display">4</span></label>
+        <br>
+        <input type="range" id="n-slider" min="1" max="8" value="4" step="1">
+    </div>
+
+    <div class="readout">
+        <div>String Length (L) = 80 cm</div>
+        <div>Wavelength (&lambda;) = <span id="lambda-display">40</span> cm</div>
+        <div class="formula" id="formula-display">80 = 4 &times; (40 / 2)</div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('waveCanvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('n-slider');
+    const nDisplay = document.getElementById('n-display');
+    const lambdaDisplay = document.getElementById('lambda-display');
+    const formulaDisplay = document.getElementById('formula-display');
+
+    let n = parseInt(slider.value);
+    const L = 80; // String length in cm
+    const width = canvas.width;
+    const height = canvas.height;
+    const amplitude = 90;
+    let time = 0;
+
+    function updateReadout() {
+        n = parseInt(slider.value);
+        nDisplay.textContent = n;
+        
+        // Calculate wavelength: L = n * (lambda / 2) => lambda = 2L / n
+        const lambda = (2 * L) / n;
+        const lambdaFormatted = Number.isInteger(lambda) ? lambda : lambda.toFixed(2);
+        
+        lambdaDisplay.textContent = lambdaFormatted;
+        formulaDisplay.innerHTML = `80 = ${n} &times; (${lambdaFormatted} / 2)`;
+    }
+
+    slider.addEventListener('input', updateReadout);
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw equilibrium line (string at rest)
+        ctx.beginPath();
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.strokeStyle = '#cbd5e0';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Time multiplier to simulate oscillation
+        const oscillation = Math.cos(time);
+
+        // Draw the envelope (ghost waves)
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(49, 130, 206, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        
+        // Upper envelope
+        for (let x = 0; x <= width; x++) {
+            const y = height / 2 - amplitude * Math.sin((n * Math.PI * x) / width);
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Lower envelope
+        ctx.beginPath();
+        for (let x = 0; x <= width; x++) {
+            const y = height / 2 + amplitude * Math.sin((n * Math.PI * x) / width);
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dashed lines
+
+        // Draw active standing wave
+        ctx.beginPath();
+        ctx.strokeStyle = '#3182ce';
+        ctx.lineWidth = 3;
+        
+        for (let x = 0; x <= width; x++) {
+            const y = height / 2 - amplitude * Math.sin((n * Math.PI * x) / width) * oscillation;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Draw and label Nodes and Antinodes
+        ctx.font = '12px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        
+        // Nodes (Points of zero movement)
+        for (let i = 0; i <= n; i++) {
+            const nodeX = (i * width) / n;
+            const nodeY = height / 2;
+            
+            ctx.beginPath();
+            ctx.arc(nodeX, nodeY, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#2d3748';
+            ctx.fill();
+            
+            ctx.fillStyle = '#4a5568';
+            if (i === 0) ctx.fillText('Node', nodeX + 18, nodeY + 20);
+            else if (i === n) ctx.fillText('Node', nodeX - 18, nodeY + 20);
+            else ctx.fillText('Node', nodeX, nodeY + 22);
+        }
+
+        // Antinodes (Points of maximum movement)
+        for (let i = 0; i < n; i++) {
+            const antiNodeX = ((i + 0.5) * width) / n;
+            const antiNodeY = height / 2 - amplitude * Math.sin((n * Math.PI * antiNodeX) / width) * oscillation;
+            
+            ctx.beginPath();
+            ctx.arc(antiNodeX, antiNodeY, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#e53e3e';
+            ctx.fill();
+
+            // Label positioning logic to prevent jitter and overlap
+            const maxDisplacementY = height / 2 - amplitude * Math.sin((n * Math.PI * antiNodeX) / width);
+            let labelY = maxDisplacementY < height / 2 ? maxDisplacementY - 15 : maxDisplacementY + 25;
+            
+            ctx.fillStyle = '#c53030';
+            // Limit labels if 'n' gets too high to avoid clutter
+            if (n <= 5 || i % 2 === 0) {
+                ctx.fillText('Antinode', antiNodeX, labelY);
+            }
+        }
+
+        // Advance time for animation
+        time += 0.05;
+        requestAnimationFrame(draw);
+    }
+
+    // Initialize display and start animation
+    updateReadout();
+    draw();
+</script>
+</body>
+</html>

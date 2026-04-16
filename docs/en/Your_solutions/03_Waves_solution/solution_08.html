@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traveling Waves Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS Variables for Auto Dark/Light Mode */
+        :root {
+            --bg-color: #f3f4f6;
+            --panel-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #4b5563;
+            --accent: #3b82f6;
+            --border: #e5e7eb;
+            --chart-grid: #e5e7eb;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121212;
+                --panel-bg: #1e1e1e;
+                --text-main: #f9fafb;
+                --text-muted: #9ca3af;
+                --accent: #60a5fa;
+                --border: #374151;
+                --chart-grid: #374151;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .dashboard {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .controls-panel {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: #ffffff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .chart-card {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .banner {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: var(--text-main);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="controls-panel">
+        <button id="playBtn">Play / Pause</button>
+        
+        <div class="control-group">
+            <label for="timeSlider">
+                <span>Time (t)</span>
+                <span id="timeVal">0.00</span>
+            </label>
+            <input type="range" id="timeSlider" min="0" max="10" step="0.01" value="0">
+        </div>
+
+        <div class="control-group">
+            <label for="velSlider">
+                <span>Wave Velocity (v)</span>
+                <span id="velVal">2.00</span>
+            </label>
+            <input type="range" id="velSlider" min="0.1" max="5" step="0.1" value="2">
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="banner">
+            <strong>1. Non-Traveling Wave:</strong> y(x,t) = A * cos(k*x² - ω*t) <br>
+            Notice how this wave stretches, compresses, and distorts as time progresses. Because the spatial variable 'x' is squared, it cannot be written in the form f(x ± vt). It does not preserve its shape, so it is <em>not</em> a valid traveling wave.
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="chart1"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="banner">
+            <strong>2. Right-Moving Wave:</strong> y(x,t) = A * (x - v*t)² <br>
+            Notice how the parabolic pulse moves smoothly to the <strong>right</strong> without changing its shape at all. Because it is a function of (x - vt), it represents a valid traveling wave moving in the positive x-direction.
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="chart2"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="banner">
+            <strong>3. Left-Moving Wave:</strong> y(x,t) = A * log(|x + v*t|) <br>
+            Notice how the logarithmic spike moves smoothly to the <strong>left</strong> without changing its underlying shape. Because it is a function of (x + vt), it represents a valid traveling wave moving in the negative x-direction.
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="chart3"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Constants
+    const A = 1;
+    const k = 1;
+    const w = 2;
+    
+    // State variables
+    let t = 0;
+    let v = 2;
+    let isPlaying = false;
+    let animationId;
+
+    // Generate x-axis points (-10 to 10)
+    const xValues = [];
+    for (let x = -10; x <= 10; x += 0.1) {
+        xValues.push(x.toFixed(1));
+    }
+
+    // DOM Elements
+    const playBtn = document.getElementById('playBtn');
+    const timeSlider = document.getElementById('timeSlider');
+    const velSlider = document.getElementById('velSlider');
+    const timeVal = document.getElementById('timeVal');
+    const velVal = document.getElementById('velVal');
+
+    // Chart common styling based on CSS variables
+    const getGridColor = () => getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim();
+    const getTextColor = () => getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
+    const getAccentColor = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+
+    const commonOptions = (yMin, yMax) => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false, // Turn off Chart.js native animation for smooth manual frame updates
+        elements: {
+            point: { radius: 0 } // Hide data points, show only the line
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false }
+        },
+        scales: {
+            x: {
+                type: 'category',
+                grid: { color: getGridColor() },
+                ticks: { color: getTextColor(), maxTicksLimit: 21 }
+            },
+            y: {
+                min: yMin,
+                max: yMax,
+                grid: { color: getGridColor() },
+                ticks: { color: getTextColor() }
+            }
+        }
+    });
+
+    // Initialize Charts
+    const ctx1 = document.getElementById('chart1').getContext('2d');
+    const chart1 = new Chart(ctx1, {
+        type: 'line',
+        data: { labels: xValues, datasets: [{ data: [], borderColor: '#ef4444', borderWidth: 2, tension: 0.4 }] },
+        options: commonOptions(-1.5, 1.5) // Fixed Y-axis to prevent erratic scaling
+    });
+
+    const ctx2 = document.getElementById('chart2').getContext('2d');
+    const chart2 = new Chart(ctx2, {
+        type: 'line',
+        data: { labels: xValues, datasets: [{ data: [], borderColor: '#10b981', borderWidth: 2, tension: 0.4 }] },
+        options: commonOptions(0, 100)
+    });
+
+    const ctx3 = document.getElementById('chart3').getContext('2d');
+    const chart3 = new Chart(ctx3, {
+        type: 'line',
+        data: { labels: xValues, datasets: [{ data: [], borderColor: '#8b5cf6', borderWidth: 2, tension: 0.4 }] },
+        options: commonOptions(-3, 3)
+    });
+
+    // Math Functions
+    function calculateData() {
+        const data1 = [];
+        const data2 = [];
+        const data3 = [];
+
+        for (let i = 0; i < xValues.length; i++) {
+            const x = parseFloat(xValues[i]);
+            
+            // 1. y(x,t) = A * cos(k*x^2 - w*t)
+            data1.push(A * Math.cos(k * x * x - w * t));
+            
+            // 2. y(x,t) = A * (x - v*t)^2
+            data2.push(A * Math.pow(x - v * t, 2));
+            
+            // 3. y(x,t) = A * log(|x + v*t|)
+            // Added 0.05 to prevent absolute -Infinity at the singularity for cleaner rendering
+            data3.push(A * Math.log(Math.max(0.05, Math.abs(x + v * t)))); 
+        }
+
+        return { data1, data2, data3 };
+    }
+
+    // Update charts loop
+    function updateCharts() {
+        const { data1, data2, data3 } = calculateData();
+        
+        chart1.data.datasets[0].data = data1;
+        chart2.data.datasets[0].data = data2;
+        chart3.data.datasets[0].data = data3;
+        
+        chart1.update();
+        chart2.update();
+        chart3.update();
+
+        timeSlider.value = t;
+        timeVal.textContent = t.toFixed(2);
+    }
+
+    // Animation Loop
+    function animate() {
+        if (!isPlaying) return;
+        
+        t += 0.02; // Increment time
+        if (t >= parseFloat(timeSlider.max)) {
+            t = 0; // Loop back to start
+        }
+        
+        updateCharts();
+        animationId = requestAnimationFrame(animate);
+    }
+
+    // Event Listeners
+    playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying) {
+            playBtn.style.backgroundColor = '#ef4444'; // Red for pause
+            playBtn.textContent = 'Pause';
+            animate();
+        } else {
+            playBtn.style.backgroundColor = getAccentColor(); // Back to blue
+            playBtn.textContent = 'Play';
+            cancelAnimationFrame(animationId);
+        }
+    });
+
+    timeSlider.addEventListener('input', (e) => {
+        t = parseFloat(e.target.value);
+        if (!isPlaying) {
+            updateCharts();
+        }
+    });
+
+    velSlider.addEventListener('input', (e) => {
+        v = parseFloat(e.target.value);
+        velVal.textContent = v.toFixed(2);
+        if (!isPlaying) {
+            updateCharts();
+        }
+    });
+
+    // Detect system theme changes to update chart grid/text colors instantly
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        const opts = [chart1.options, chart2.options, chart3.options];
+        opts.forEach(opt => {
+            opt.scales.x.grid.color = getGridColor();
+            opt.scales.y.grid.color = getGridColor();
+            opt.scales.x.ticks.color = getTextColor();
+            opt.scales.y.ticks.color = getTextColor();
+        });
+        updateCharts();
+    });
+
+    // Initial render
+    updateCharts();
+</script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+
+<style>
+@keyframes wave-pulse { 0%,100%{opacity:.7} 50%{opacity:1} }
+.label-pill { font-size:11px; font-weight:500; padding:2px 8px; border-radius:12px; }
+</style>
+
+<h2 class="sr-only">Interactive standing waves and harmonics on a guitar string simulation</h2>
+
+<div style="padding:1.5rem 0 0;">
+
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:1.25rem;flex-wrap:wrap">
+  <span style="font-size:13px;color:var(--color-text-secondary);white-space:nowrap">Harmonic n =</span>
+  <input type="range" min="1" max="5" value="1" id="harmonic-slider" step="1" style="flex:1;min-width:140px">
+  <span id="n-badge" style="font-size:22px;font-weight:500;min-width:24px;color:var(--color-text-primary)">1</span>
+  <span id="mode-label" style="font-size:13px;color:var(--color-text-secondary)">Fundamental</span>
+</div>
+
+<canvas id="wave-canvas" style="width:100%;display:block;border-radius:var(--border-radius-md);"></canvas>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:1.25rem">
+  <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.85rem 1rem">
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">Wavelength λ</div>
+    <div id="stat-lambda" style="font-size:19px;font-weight:500;color:var(--color-text-primary)">1.28 m</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">λ = 2L / n</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.85rem 1rem">
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">Frequency f</div>
+    <div id="stat-freq" style="font-size:19px;font-weight:500;color:var(--color-text-primary)">330 Hz</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">f = n · 330 Hz</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.85rem 1rem">
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">Antinodes</div>
+    <div id="stat-anti" style="font-size:19px;font-weight:500;color:var(--color-text-primary)">1</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">= n</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.85rem 1rem">
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">Nodes</div>
+    <div id="stat-nodes" style="font-size:19px;font-weight:500;color:var(--color-text-primary)">2</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">= n + 1</div>
+  </div>
+</div>
+
+<div style="margin-top:1rem;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div style="width:10px;height:10px;border-radius:50%;background:#4A8FDD"></div>
+    <span style="font-size:12px;color:var(--color-text-secondary)">Node (zero motion)</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <div style="width:10px;height:10px;border-radius:50%;background:#E07A3A"></div>
+    <span style="font-size:12px;color:var(--color-text-secondary)">Antinode (max motion)</span>
+  </div>
+  <div style="font-size:12px;color:var(--color-text-tertiary);margin-left:auto">L = 0.64 m · v = 422.4 m/s</div>
+</div>
+
+</div>
+
+<script>
+const canvas = document.getElementById('wave-canvas');
+const ctx = canvas.getContext('2d');
+const slider = document.getElementById('harmonic-slider');
+const modeNames = ['', 'Fundamental (1st)', '2nd harmonic', '3rd harmonic', '4th harmonic', '5th harmonic'];
+
+let n = 1, t = 0, raf;
+const L = 0.64, v = 422.4, f0 = 330;
+const isDark = () => matchMedia('(prefers-color-scheme:dark)').matches;
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const h = Math.max(180, Math.min(240, w * 0.35));
+  canvas.style.height = h + 'px';
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+}
+
+function draw() {
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, w, h);
+
+  const dark = isDark();
+  const pad = 32;
+  const cx = w / 2;
+  const cy = h / 2;
+  const strW = w - pad * 2;
+  const amp = (h / 2 - 28) * 0.78;
+
+  // Background subtle grid lines
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  ctx.lineWidth = 0.5;
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(pad, cy - amp * (i/4));
+    ctx.lineTo(w - pad, cy - amp * (i/4));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pad, cy + amp * (i/4));
+    ctx.lineTo(w - pad, cy + amp * (i/4));
+    ctx.stroke();
+  }
+
+  // Envelope (max displacement outline)
+  const envColor = dark ? 'rgba(74,143,221,0.12)' : 'rgba(74,143,221,0.10)';
+  ctx.beginPath();
+  for (let px = 0; px <= strW; px++) {
+    const x0 = px / strW;
+    const y = amp * Math.sin(n * Math.PI * x0);
+    ctx.lineTo(pad + px, cy - y);
+  }
+  ctx.strokeStyle = dark ? 'rgba(74,143,221,0.22)' : 'rgba(74,143,221,0.18)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  for (let px = 0; px <= strW; px++) {
+    const x0 = px / strW;
+    const y = amp * Math.sin(n * Math.PI * x0);
+    ctx.lineTo(pad + px, cy + y);
+  }
+  ctx.strokeStyle = dark ? 'rgba(74,143,221,0.22)' : 'rgba(74,143,221,0.18)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Animated wave — gradient color by displacement
+  const phase = 2 * Math.PI * t;
+  const grad = ctx.createLinearGradient(pad, 0, w - pad, 0);
+  grad.addColorStop(0,   dark ? '#4A8FDD' : '#2A72C3');
+  grad.addColorStop(0.5, dark ? '#E07A3A' : '#CC5F1F');
+  grad.addColorStop(1,   dark ? '#4A8FDD' : '#2A72C3');
+
+  ctx.beginPath();
+  ctx.moveTo(pad, cy);
+  for (let px = 0; px <= strW; px++) {
+    const x0 = px / strW;
+    const y = amp * Math.sin(n * Math.PI * x0) * Math.cos(phase);
+    ctx.lineTo(pad + px, cy - y);
+  }
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Fixed endpoints
+  ctx.fillStyle = dark ? '#8A8A8A' : '#555';
+  ctx.fillRect(pad - 6, cy - 14, 6, 28);
+  ctx.fillRect(w - pad, cy - 14, 6, 28);
+
+  // Node labels
+  for (let i = 0; i <= n; i++) {
+    const nx = pad + (i / n) * strW;
+    // Dot
+    ctx.beginPath();
+    ctx.arc(nx, cy, 5.5, 0, Math.PI * 2);
+    ctx.fillStyle = dark ? '#5C9FE8' : '#4A8FDD';
+    ctx.fill();
+    // Label
+    ctx.font = '10px "Anthropic Sans", sans-serif';
+    ctx.fillStyle = dark ? '#5C9FE8' : '#3A77CC';
+    ctx.textAlign = 'center';
+    const labelY = cy + (i % 2 === 0 ? 20 : -12);
+    ctx.fillText('N', nx, labelY);
+  }
+
+  // Antinode labels
+  for (let i = 0; i < n; i++) {
+    const ax = pad + ((i + 0.5) / n) * strW;
+    const aY = cy - amp * Math.sign(Math.sin((i + 0.5) * Math.PI));
+    ctx.beginPath();
+    ctx.arc(ax, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = dark ? '#E07A3A' : '#D06020';
+    ctx.fill();
+    ctx.font = '10px "Anthropic Sans", sans-serif';
+    ctx.fillStyle = dark ? '#E07A3A' : '#C05010';
+    ctx.textAlign = 'center';
+    const sign = Math.sin((i + 0.5) * Math.PI) >= 0 ? -1 : 1;
+    ctx.fillText('A', ax, cy + sign * 20);
+  }
+
+  t += 0.012;
+}
+
+function loop() {
+  draw();
+  raf = requestAnimationFrame(loop);
+}
+
+function update() {
+  n = +slider.value;
+  document.getElementById('n-badge').textContent = n;
+  document.getElementById('mode-label').textContent = modeNames[n];
+  const lambda = (2 * L / n).toFixed(2);
+  const freq = (n * f0).toFixed(0);
+  document.getElementById('stat-lambda').textContent = lambda + ' m';
+  document.getElementById('stat-freq').textContent = freq + ' Hz';
+  document.getElementById('stat-anti').textContent = n;
+  document.getElementById('stat-nodes').textContent = n + 1;
+}
+
+slider.addEventListener('input', update);
+window.addEventListener('resize', () => { resize(); });
+
+resize();
+update();
+loop();
+</script>

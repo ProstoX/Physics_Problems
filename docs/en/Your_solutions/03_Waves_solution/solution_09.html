@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Damped Harmonic Oscillator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --primary: #3b82f6;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        #regime-badge {
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .control-panel {
+            background-color: var(--panel-bg);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            width: 300px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .charts-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chart-container {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            flex: 1;
+            position: relative;
+            min-height: 300px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        span.value-display {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .constants {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+            }
+            .control-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Damped Harmonic Oscillator</h1>
+        <div id="regime-badge">Loading Regime...</div>
+    </header>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="bSlider">
+                    Damping Coeff (b)
+                    <span class="value-display" id="bValue">0.5</span>
+                </label>
+                <input type="range" id="bSlider" min="0" max="5" step="0.1" value="0.5">
+            </div>
+
+            <div class="control-group">
+                <label for="x0Slider">
+                    Initial Position (x₀)
+                    <span class="value-display" id="x0Value">1.0</span>
+                </label>
+                <input type="range" id="x0Slider" min="-5" max="5" step="0.1" value="1">
+            </div>
+
+            <div class="control-group">
+                <label for="v0Slider">
+                    Initial Velocity (v₀)
+                    <span class="value-display" id="v0Value">0.0</span>
+                </label>
+                <input type="range" id="v0Slider" min="-5" max="5" step="0.1" value="0">
+            </div>
+
+            <div class="constants">
+                <strong>System Constants:</strong><br>
+                Mass (m) = 1<br>
+                Spring Constant (k) = 1<br>
+                <em>dx/dt = v</em><br>
+                <em>dv/dt = -(b/m)v - (k/m)x</em>
+            </div>
+        </div>
+
+        <div class="charts-panel">
+            <div class="chart-container">
+                <canvas id="posChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="phaseChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // System Constants
+        const m = 1;
+        const k = 1;
+        const tMax = 20;
+        const dt = 0.05;
+
+        // DOM Elements
+        const bSlider = document.getElementById('bSlider');
+        const x0Slider = document.getElementById('x0Slider');
+        const v0Slider = document.getElementById('v0Slider');
+        const bValue = document.getElementById('bValue');
+        const x0Value = document.getElementById('x0Value');
+        const v0Value = document.getElementById('v0Value');
+        const regimeBadge = document.getElementById('regime-badge');
+
+        // Initialize Charts
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#64748b';
+
+        const posCtx = document.getElementById('posChart').getContext('2d');
+        const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false, // Disable animation for smooth real-time dragging
+            plugins: {
+                legend: { display: false }
+            }
+        };
+
+        const posChart = new Chart(posCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Position (x)',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    title: { display: true, text: 'Position vs. Time (x vs t)', color: '#0f172a', font: { size: 16 } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: 'Time (t)' }, min: 0, max: tMax },
+                    y: { title: { display: true, text: 'Position (x)' }, suggestedMin: -5, suggestedMax: 5 }
+                }
+            }
+        });
+
+        const phaseChart = new Chart(phaseCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Velocity (v)',
+                    data: [],
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    title: { display: true, text: 'Phase Portrait (v vs x)', color: '#0f172a', font: { size: 16 } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: 'Position (x)' }, suggestedMin: -5, suggestedMax: 5 },
+                    y: { title: { display: true, text: 'Velocity (v)' }, suggestedMin: -5, suggestedMax: 5 }
+                }
+            }
+        });
+
+        // Runge-Kutta 4th Order Implementation
+        function runSimulation(b, x0, v0) {
+            let t = 0;
+            let x = x0;
+            let v = v0;
+            
+            const posData = [];
+            const phaseData = [];
+
+            const dxdt = (v) => v;
+            const dvdt = (x, v) => -(b / m) * v - (k / m) * x;
+
+            while (t <= tMax) {
+                posData.push({ x: t, y: x });
+                phaseData.push({ x: x, y: v });
+
+                let k1x = dxdt(v);
+                let k1v = dvdt(x, v);
+
+                let k2x = dxdt(v + 0.5 * dt * k1v);
+                let k2v = dvdt(x + 0.5 * dt * k1x, v + 0.5 * dt * k1v);
+
+                let k3x = dxdt(v + 0.5 * dt * k2v);
+                let k3v = dvdt(x + 0.5 * dt * k2x, v + 0.5 * dt * k2v);
+
+                let k4x = dxdt(v + dt * k3v);
+                let k4v = dvdt(x + dt * k3x, v + dt * k3v);
+
+                x += (dt / 6) * (k1x + 2 * k2x + 2 * k3x + k4x);
+                v += (dt / 6) * (k1v + 2 * k2v + 2 * k3v + k4v);
+                t += dt;
+            }
+
+            return { posData, phaseData };
+        }
+
+        // Update UI and Charts
+        function updateAll() {
+            const b = parseFloat(bSlider.value);
+            const x0 = parseFloat(x0Slider.value);
+            const v0 = parseFloat(v0Slider.value);
+
+            // Update Labels
+            bValue.textContent = b.toFixed(1);
+            x0Value.textContent = x0.toFixed(1);
+            v0Value.textContent = v0.toFixed(1);
+
+            // Update Regime Badge
+            const criticalDamping = 2 * Math.sqrt(m * k);
+            if (Math.abs(b - criticalDamping) < 0.05) {
+                regimeBadge.textContent = "Critically Damped";
+                regimeBadge.style.backgroundColor = "#d1fae5";
+                regimeBadge.style.color = "#047857";
+            } else if (b < criticalDamping) {
+                regimeBadge.textContent = "Underdamped";
+                regimeBadge.style.backgroundColor = "#fef3c7";
+                regimeBadge.style.color = "#b45309";
+            } else {
+                regimeBadge.textContent = "Overdamped";
+                regimeBadge.style.backgroundColor = "#dbeafe";
+                regimeBadge.style.color = "#1d4ed8";
+            }
+
+            // Run RK4
+            const { posData, phaseData } = runSimulation(b, x0, v0);
+
+            // Update Charts
+            posChart.data.datasets[0].data = posData;
+            posChart.update();
+
+            phaseChart.data.datasets[0].data = phaseData;
+            phaseChart.update();
+        }
+
+        // Event Listeners for real-time updating
+        bSlider.addEventListener('input', updateAll);
+        x0Slider.addEventListener('input', updateAll);
+        v0Slider.addEventListener('input', updateAll);
+
+        // Initial render
+        updateAll();
+    </script>
+</body>
+</html>
