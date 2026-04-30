@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electric Potential Visualizer</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --positive-color: #ff5252;
+            --negative-color: #448aff;
+            --neutral-color: #9e9e9e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h2 {
+            margin: 0;
+            text-align: center;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        .visualization {
+            display: flex;
+            justify-content: center;
+            position: relative;
+        }
+
+        svg {
+            background-color: #0a0a0a;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .result-panel {
+            text-align: center;
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .result-value {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: color 0.3s;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .control-group {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .charge-val {
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        /* Specific corner colors */
+        .tl-text { fill: #fff; font-family: sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: central; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Net Electric Potential</h2>
+
+        <div class="visualization">
+            <!-- 300x300 SVG to draw the 1m square (scaled to 200px) -->
+            <svg width="300" height="300" viewBox="0 0 300 300">
+                <defs>
+                    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" id="glowStart" stop-color="#9e9e9e" stop-opacity="0" />
+                        <stop offset="100%" id="glowEnd" stop-color="#9e9e9e" stop-opacity="0" />
+                    </radialGradient>
+                </defs>
+
+                <!-- Heatmap background representing potential -->
+                <rect x="0" y="0" width="300" height="300" fill="url(#centerGlow)" />
+
+                <!-- The Square (1.0m sides) -->
+                <rect x="50" y="50" width="200" height="200" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="5,5" />
+
+                <!-- Center Point -->
+                <circle cx="150" cy="150" r="4" fill="#fff" />
+                <text x="150" y="140" fill="#aaa" font-family="sans-serif" font-size="12px" text-anchor="middle">Center</text>
+
+                <!-- Corner Charges -->
+                <!-- Top Left (q1) -->
+                <circle id="c1" cx="50" cy="50" r="18" fill="#ff5252" />
+                <text id="t1" x="50" y="50" class="tl-text">+1</text>
+
+                <!-- Top Right (q2) -->
+                <circle id="c2" cx="250" cy="50" r="18" fill="#448aff" />
+                <text id="t2" x="250" y="50" class="tl-text">-2</text>
+
+                <!-- Bottom Right (q3) -->
+                <circle id="c3" cx="250" cy="250" r="18" fill="#ff5252" />
+                <text id="t3" x="250" y="250" class="tl-text">+3</text>
+
+                <!-- Bottom Left (q4) -->
+                <circle id="c4" cx="50" cy="250" r="18" fill="#448aff" />
+                <text id="t4" x="50" y="250" class="tl-text">-4</text>
+            </svg>
+        </div>
+
+        <div class="result-panel">
+            <div>Net Potential at Center (V)</div>
+            <div class="result-value" id="net-potential">0.00e+0 V</div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Top-Left (q₁)</span>
+                    <span class="charge-val" id="v1-val">+1 C</span>
+                </div>
+                <input type="range" id="q1" min="-10" max="10" value="1" step="1">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Top-Right (q₂)</span>
+                    <span class="charge-val" id="v2-val">-2 C</span>
+                </div>
+                <input type="range" id="q2" min="-10" max="10" value="-2" step="1">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Bottom-Left (q₄)</span>
+                    <span class="charge-val" id="v4-val">-4 C</span>
+                </div>
+                <input type="range" id="q4" min="-10" max="10" value="-4" step="1">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <span>Bottom-Right (q₃)</span>
+                    <span class="charge-val" id="v3-val">+3 C</span>
+                </div>
+                <input type="range" id="q3" min="-10" max="10" value="3" step="1">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Physical Constants
+        const k = 8.98755e9; // Coulomb's constant (N m^2 / C^2)
+        const sideLength = 1.0; // meters
+        const r = (sideLength * Math.sqrt(2)) / 2; // Distance from corner to center
+
+        // DOM Elements
+        const sliders = {
+            q1: document.getElementById('q1'),
+            q2: document.getElementById('q2'),
+            q3: document.getElementById('q3'),
+            q4: document.getElementById('q4')
+        };
+        const displays = {
+            q1: document.getElementById('v1-val'),
+            q2: document.getElementById('v2-val'),
+            q3: document.getElementById('v3-val'),
+            q4: document.getElementById('v4-val')
+        };
+        const svgCircles = {
+            q1: document.getElementById('c1'),
+            q2: document.getElementById('c2'),
+            q3: document.getElementById('c3'),
+            q4: document.getElementById('c4')
+        };
+        const svgTexts = {
+            q1: document.getElementById('t1'),
+            q2: document.getElementById('t2'),
+            q3: document.getElementById('t3'),
+            q4: document.getElementById('t4')
+        };
+        
+        const netPotentialDisplay = document.getElementById('net-potential');
+        const glowStart = document.getElementById('glowStart');
+
+        // Helper to format numbers nicely
+        function formatScientific(num) {
+            if (num === 0) return "0.00 V";
+            return num.toExponential(2).replace('e+', ' × 10^').replace('e-', ' × 10^-') + ' V';
+        }
+
+        // Helper to get color based on charge sign
+        function getColor(charge) {
+            if (charge > 0) return 'var(--positive-color)';
+            if (charge < 0) return 'var(--negative-color)';
+            return 'var(--neutral-color)';
+        }
+
+        function updateVisualization() {
+            let totalCharge = 0;
+
+            // Update individual charges
+            for (let key in sliders) {
+                const charge = parseInt(sliders[key].value);
+                totalCharge += charge;
+                
+                // Update text
+                const sign = charge > 0 ? '+' : '';
+                displays[key].textContent = `${sign}${charge} C`;
+                svgTexts[key].textContent = `${sign}${charge}`;
+
+                // Update visual color of the point charge
+                svgCircles[key].setAttribute('fill', getColor(charge));
+            }
+
+            // Calculate Net Potential
+            // V = k * (q1 + q2 + q3 + q4) / r
+            const netV = (k * totalCharge) / r;
+            
+            // Update Number Display
+            netPotentialDisplay.textContent = formatScientific(netV);
+            netPotentialDisplay.style.color = getColor(netV);
+
+            // Update Center Glow (Heatmap)
+            // Max absolute charge sum is 40. Scale opacity based on this max possible value.
+            const maxChargeSum = 40;
+            const opacity = Math.min(Math.abs(totalCharge) / maxChargeSum, 1) * 0.8; // Max 80% opacity
+            
+            let glowColor = '#9e9e9e'; // neutral
+            if (netV > 0) glowColor = '#ff5252';
+            else if (netV < 0) glowColor = '#448aff';
+
+            glowStart.setAttribute('stop-color', glowColor);
+            glowStart.setAttribute('stop-opacity', opacity.toString());
+        }
+
+        // Attach listeners
+        for (let key in sliders) {
+            sliders[key].addEventListener('input', updateVisualization);
+        }
+
+        // Initial render
+        updateVisualization();
+    </script>
+</body>
+</html>

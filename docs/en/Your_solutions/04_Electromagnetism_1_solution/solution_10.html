@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magnetic Lorentz Force Visualization (F = BILsinθ)</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        
+        #ui-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            width: 300px;
+            z-index: 100;
+        }
+
+        #ui-panel h2 { margin-top: 0; font-size: 1.2em; color: #333; }
+        
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; color: #555; }
+        .slider-container { display: flex; align-items: center; }
+        .slider-container input { flex-grow: 1; margin-right: 10px; cursor: pointer; }
+        .value-display { font-family: monospace; width: 60px; text-align: right; }
+
+        #formula-display {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #222;
+        }
+        .color-legend { display: flex; align-items: center; margin-top: 5px; font-size: 0.8em;}
+        .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="ui-panel">
+    <h2>Lorentz Force: F = ILB sin(θ)</h2>
+    
+    <div class="color-legend">
+        <span class="dot" style="background-color: #DAA520;"></span> Wire/Current (I) along X-axis
+    </div>
+    <div class="color-legend">
+        <span class="dot" style="background-color: #4169E1;"></span> Magnetic Field (B) in XY plane
+    </div>
+    <div class="color-legend">
+        <span class="dot" style="background-color: #FF4500;"></span> Magnetic Force (F) along Z-axis
+    </div>
+    <br>
+
+    <div class="control-group">
+        <label>Current (I):</label>
+        <div class="slider-container">
+            <input type="range" id="sliderI" min="0" max="20" step="0.1" value="10">
+            <span class="value-display" id="valI">10.0 A</span>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <label>Magnetic Field (B):</label>
+        <div class="slider-container">
+            <input type="range" id="sliderB" min="0" max="2" step="0.01" value="1">
+            <span class="value-display" id="valB">1.00 T</span>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <label>Angle (θ) [B relative to Wire]:</label>
+        <div class="slider-container">
+            <input type="range" id="sliderTheta" min="0" max="180" step="1" value="90">
+            <span class="value-display" id="valTheta">90°</span>
+        </div>
+    </div>
+
+    <div id="formula-display">
+        F = <span id="calcI">10.0</span> * <span id="calcL">2.0</span> * <span id="calcB">1.00</span> * sin(<span id="calcTheta">90</span>°) = <span id="calcResult">20.00</span> N
+    </div>
+</div>
+
+<!-- Three.js and OrbitControls via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+    // --- Setup ---
+    let scene, camera, renderer, controls;
+    const L = 2.0; // Constant wire length in meters
+
+    // Colors
+    const colorWire = 0xDAA520; // Goldenrod
+    const colorB = 0x4169E1;    // RoyalBlue
+    const colorF = 0xFF4500;    // OrangeRed
+    const colorParticle = 0xFFFFFF;
+
+    // Objects needed for dynamic updates
+    let bFieldGroup, forceArrow, particles = [];
+
+    // State variables
+    let currentI = 10.0;
+    let fieldB = 1.0;
+    let thetaDeg = 90;
+
+    init();
+    animate();
+
+    function init() {
+        // Scene & Camera
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(2, 2, 4);
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Controls
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // Helpers & Lighting
+        scene.add(new THREE.GridHelper(10, 10));
+        //scene.add(new THREE.AxesHelper(1)); // Optional: visual X(red), Y(green), Z(blue) axes
+        
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 2, 3);
+        scene.add(directionalLight);
+
+        // --- Visual Elements ---
+
+        // 1. The Wire (Cylinder along horizontal X-axis)
+        // By default cylinders are along Y, we rotate it.
+        const wireGeo = new THREE.CylinderGeometry(0.05, 0.05, L, 16);
+        const wireMat = new THREE.MeshPhongMaterial({ color: colorWire });
+        const wire = new THREE.Mesh(wireGeo, wireMat);
+        wire.rotation.z = Math.PI / 2; // Rotate from Y-axis to X-axis
+        scene.add(wire);
+
+        // 2. Moving Particles (Current Direction indicators)
+        const particleGeo = new THREE.SphereGeometry(0.02, 8, 8);
+        const particleMat = new THREE.MeshBasicMaterial({ color: colorParticle });
+        for (let i = 0; i < 10; i++) {
+            const particle = new THREE.Mesh(particleGeo, particleMat);
+            particles.push(particle);
+            scene.add(particle);
+        }
+
+        // 3. Magnetic Field (B) Arrows (Uniform Array)
+        bFieldGroup = new THREE.Group();
+        const bArrowLength = 0.5;
+        const bArrowHeadWidth = 0.1;
+        const bArrowHeadLength = 0.15;
+        const arrowDir = new THREE.Vector3(1, 0, 0); // Temporary direction
+        const gridSpacing = 0.5;
+        
+        // Create a 3D grid of arrows around the wire
+        for (let x = -2; x <= 2; x += gridSpacing) {
+            for (let y = -1; y <= 1; y += gridSpacing) {
+                // Keep arrows slightly away from wire center line for visibility
+                if (Math.abs(y) < 0.1) continue; 
+                
+                const arrowHelper = new THREE.ArrowHelper(
+                    arrowDir, 
+                    new THREE.Vector3(x, y, 0), 
+                    bArrowLength, 
+                    colorB, 
+                    bArrowHeadLength, 
+                    bArrowHeadWidth
+                );
+                bFieldGroup.add(arrowHelper);
+            }
+        }
+        scene.add(bFieldGroup);
+
+        // 4. Magnetic Force (F) Arrow (Starts at center, points Z or -Z)
+        // Origin(0,0,0), initial Dir(0,0,1), length(0)
+        forceArrow = new THREE.ArrowHelper(
+            new THREE.Vector3(0, 0, 1), 
+            new THREE.Vector3(0, 0, 0), 
+            1, // Length updated dynamically
+            colorF, 
+            0.2, // head length
+            0.15 // head width
+        );
+        scene.add(forceArrow);
+
+        // Set initial visual state based on defaults
+        updateVisualization();
+        setupUIListeners();
+        window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function setupUIListeners() {
+        const sliders = {
+            I: document.getElementById('sliderI'),
+            B: document.getElementById('sliderB'),
+            Theta: document.getElementById('sliderTheta')
+        };
+
+        const displays = {
+            I: document.getElementById('valI'),
+            B: document.getElementById('valB'),
+            Theta: document.getElementById('valTheta')
+        };
+
+        sliders.I.addEventListener('input', (e) => {
+            currentI = parseFloat(e.target.value);
+            displays.I.innerText = currentI.toFixed(1) + " A";
+            updateVisualization();
+        });
+
+        sliders.B.addEventListener('input', (e) => {
+            fieldB = parseFloat(e.target.value);
+            displays.B.innerText = fieldB.toFixed(2) + " T";
+            updateVisualization();
+        });
+
+        sliders.Theta.addEventListener('input', (e) => {
+            thetaDeg = parseInt(e.target.value);
+            displays.Theta.innerText = thetaDeg + "°";
+            updateVisualization();
+        });
+    }
+
+    function updateVisualization() {
+        // Convert angle to radians
+        const thetaRad = (thetaDeg * Math.PI) / 180;
+
+        // 1. Update Magnetic Field B visual rotation
+        // The wire is along X-axis. Angle θ is defined relative to wire.
+        // We will rotate B-field within the XY plane for easy viewing.
+        // Thumb along L(X), Fingers curl to B(XY plane), Palm points F(Z-axis).
+        bFieldGroup.children.forEach(arrow => {
+            // New direction vector for B based on theta
+            const newDir = new THREE.Vector3(Math.cos(thetaRad), Math.sin(thetaRad), 0);
+            arrow.setDirection(newDir);
+        });
+
+        // 2. Update Force F visual length and direction based on right-hand rule
+        // Formula: F_vec = I * L_vec x B_vec
+        // L_vec is constant along (1,0,0). B_vec is (cos(θ), sin(θ), 0).
+        // L x B is (0, 0, sin(θ)). 
+        // Force direction is purely along Z (positive or negative).
+
+        // Calculate Magnitude: F = I * L * B * sin(θ)
+        const forceMagnitude = currentI * L * fieldB * Math.sin(thetaRad);
+
+        // Visually scale the force arrow (make max force visually ~2 units long)
+        // Max possible F = 20A * 2m * 2T * 1 = 80N. Scale factor approx 0.025
+        const visualScaleFactor = 0.025;
+        let visualLength = Math.abs(forceMagnitude) * visualScaleFactor;
+        
+        // Decide direction: positive Z or negative Z based on sin(θ)
+        // Note: Right hand rule applied in standard OpenGL Righthanded coordinates (X-right, Y-up, Z-out).
+        // Thumb X, Fingers twisted towards B (in XY plane), palm points along Z or -Z.
+        let forceDir = new THREE.Vector3(0, 0, 1);
+        if (forceMagnitude < 0) {
+             // In physical terms sin(0-180) is always pos, but if we allowed other ranges, this handles it.
+             // If cross product yielded negative Z, handle here. L(1,0,0) x B(cos, sin, 0) -> (0,0,sin).
+             // Since sin(0-180) > 0, F is always positive Z for standard conventional current along +X.
+             // However, ArrowHelper requires a normalized direction vector and positive length.
+             forceDir.set(0, 0, -1);
+        }
+
+        // Hide arrow if force is zero (or very close) to avoid rendering errors
+        if (visualLength < 0.01) {
+            forceArrow.visible = false;
+        } else {
+            forceArrow.visible = true;
+            forceArrow.setDirection(forceDir.normalize());
+            forceArrow.setLength(visualLength, visualLength * 0.2, visualLength * 0.1); 
+        }
+
+        // 3. Update UI Formula Display
+        document.getElementById('calcI').innerText = currentI.toFixed(1);
+        document.getElementById('calcB').innerText = fieldB.toFixed(2);
+        document.getElementById('calcTheta').innerText = thetaDeg;
+        document.getElementById('calcResult').innerText = Math.abs(forceMagnitude).toFixed(2);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        // Animate particles along the wire to indicate current flow (velocity prop to I)
+        const time = Date.now() * 0.001;
+        const speed = currentI * 0.1; // adjust scaling as needed
+
+        particles.forEach((p, i) => {
+            // Distribute along wire (-L/2 to +L/2 along X axis, since wire is rotated)
+            const offset = (i / particles.length) * L - (L / 2);
+            let xPos = (offset + time * speed) % L;
+            
+            // Adjust to center wire range (-1 to 1)
+            if (xPos > (L/2)) xPos -= L;
+            if (xPos < -(L/2)) xPos += L;
+
+            // Wire cylinder geometry is standard, positioned at origin, rotated to X axis.
+            // Vertices are at (0, y, 0) where -L/2 < y < L/2 before rotation.
+            // After mesh rotation, local Y is global X.
+            p.position.set(xPos, 0, 0); 
+            
+            // Hide particles if current is 0
+            p.visible = (currentI > 0.01);
+        });
+
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+</script>
+</body>
+</html>

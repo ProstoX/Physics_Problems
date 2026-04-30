@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proton Electric Field Levitation</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #22d3ee; /* Cyan */
+            --plate-pos: #f87171; /* Red */
+            --plate-neg: #60a5fa; /* Blue */
+            --force-e: #fb923c;   /* Orange for Electric */
+            --force-g: #a78bfa;   /* Purple for Gravity */
+            --success: #4ade80;   /* Green */
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- Sidebar Style --- */
+        #sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            margin: 0 0 5px 0;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin: 0 0 10px 0;
+            line-height: 1.4;
+        }
+
+        /* --- Controls --- */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* --- Data Panel --- */
+        .data-panel {
+            background-color: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .data-header {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-family: monospace;
+            font-size: 0.95rem;
+        }
+        
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .unit { color: var(--text-muted); margin-left: 3px;}
+
+        /* --- Badges --- */
+        #statusBadge {
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            opacity: 0;
+        }
+
+        #statusBadge.visible {
+            opacity: 1;
+        }
+
+        .badge-levitate {
+            background-color: rgba(74, 222, 128, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.3);
+        }
+
+        /* --- Constants Footer --- */
+        .constants {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: auto;
+            line-height: 1.5;
+        }
+
+        /* --- Visualization Area --- */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div>
+            <h1>Force Balance Levitation</h1>
+            <p class="subtitle">Adjust the Electric Field strength ($E$) to balance gravity and make a proton float. The proton moves up or down based on net force.</p>
+        </div>
+
+        <div class="control-group">
+            <label for="eFieldSlider">
+                <span>Field Strength (E)</span>
+                <span>
+                    <span id="eSliderVal">1.02</span>
+                    <span class="unit">&times; 10<sup>-7</sup> N/C</span>
+                </span>
+            </label>
+            <!-- Range centered around equilibrium 1.02e-7 N/C -->
+            <input type="range" id="eFieldSlider" min="0" max="204" step="1" value="102">
+        </div>
+
+        <div class="data-panel">
+            <span class="data-header">Forces acting on Proton</span>
+            <div class="data-row">
+                <span style="color: var(--force-g)">Gravity (F<sub>g</sub>):</span>
+                <span>
+                    <span id="fgVal">1.63</span>
+                    <span class="unit">&times; 10<sup>-26</sup> N</span>
+                </span>
+            </div>
+            <div class="data-row">
+                <span style="color: var(--force-e)">Electric (F<sub>e</sub>):</span>
+                <span>
+                    <span id="feVal">1.63</span>
+                    <span class="unit">&times; 10<sup>-26</sup> N</span>
+                </span>
+            </div>
+            <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0;"></div>
+            <div class="data-row" style="font-weight: bold;">
+                <span>Net Force (up+):</span>
+                <span id="netForceDisplay">0.00 <span class="unit">&times; 10<sup>-26</sup> N</span></span>
+            </div>
+        </div>
+
+        <div id="statusBadge">Levitation Achieved</div>
+
+        <div class="constants">
+            <strong>Proton Properties:</strong><br>
+            Mass (m) &approx; 1.67 &times; 10<sup>-27</sup> kg<br>
+            Charge (q) &approx; 1.60 &times; 10<sup>-19</sup> C<br>
+            gravity (g) = 9.8 m/s<sup>2</sup>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas"></canvas>
+    </div>
+
+    <script>
+        // --- Constants & Physics Setup ---
+        const Q = 1.602e-19; // Proton charge (C)
+        const M = 1.673e-27; // Proton mass (kg)
+        const G_ACCEL = 9.8;   // Acceleration due to gravity (m/s^2)
+        
+        // Base value for slider, corresponds to roughly equilibrium.
+        // Fg = Fe -> mg = qE -> E = mg/q -> E approx 1.02e-7
+        const SLIDER_SCALE = 1e-9; 
+
+        // Derived Force of gravity (constant for simulation)
+        const F_G_PHYSICS = M * G_ACCEL; // approx 1.639e-26 N
+
+        // --- Canvas Setup ---
+        const container = document.getElementById('canvas-container');
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Updates elements
+        const eFieldSlider = document.getElementById('eFieldSlider');
+        const eSliderVal = document.getElementById('eSliderVal');
+        const fgValDisplay = document.getElementById('fgVal');
+        const feValDisplay = document.getElementById('feVal');
+        const netForceDisplay = document.getElementById('netForceDisplay');
+        const statusBadge = document.getElementById('statusBadge');
+
+        // Styles extracted from CSS variables for use in Canvas
+        const getCSSVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        const colors = {
+            accent: getCSSVar('--accent'),
+            platePos: getCSSVar('--plate-pos'),
+            plateNeg: getCSSVar('--plate-neg'),
+            forceE: getCSSVar('--force-e'),
+            forceG: getCSSVar('--force-g'),
+            success: getCSSVar('--success'),
+            textMuted: getCSSVar('--text-muted')
+        };
+
+        // --- Simulation State ---
+        let width, height;
+        let dpr; // Device pixel ratio for high-DPI screens
+
+        // UI State
+        let current_E = 0;
+        let physics_Fe = 0;
+        let physics_Fnet = 0;
+        let isLevitating = false;
+
+        // Particle State (in canvas coordinates)
+        let proton = {
+            x: 0,
+            y: 0,
+            vy: 0, // velocity y
+            radius: 10,
+            limitTop: 0,
+            limitBottom: 0
+        };
+
+        // Plate properties
+        const plateHeight = 15;
+        const plateMargin = 50; // space above/below plates within canvas
+
+        // Setup dimensions and particle placement
+        function resize() {
+            dpr = window.devicePixelRatio || 1;
+            width = container.clientWidth;
+            height = container.clientHeight;
+
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            ctx.scale(dpr, dpr);
+
+            proton.x = width / 2;
+            // Initialize in middle
+            if (proton.y === 0) proton.y = height / 2; 
+
+            proton.limitTop = plateMargin + plateHeight + proton.radius + 5;
+            proton.limitBottom = height - plateMargin - plateHeight - proton.radius - 5;
+            
+            // Constrain position if resizing shrinks screen
+            proton.y = Math.max(proton.limitTop, Math.min(proton.limitBottom, proton.y));
+        }
+
+        // --- Utility: formatting scientific notation ---
+        // Converts number to 'X.XX' format, implying multiplication by specific power of 10
+        function toUiNum(num, pow) {
+            return (num / Math.pow(10, pow)).toFixed(2);
+        }
+
+        // --- Interaction & Physics Updates ---
+        function updatePhysicsFromUI() {
+            // Slider value 102 -> E = 1.02e-7 N/C (Equilibrium)
+            current_E = eFieldSlider.value * SLIDER_SCALE;
+            physics_Fe = Q * current_E;
+            physics_Fnet = physics_Fe - F_G_PHYSICS; // Up is positive
+
+            // Display values in Sidebar
+            eSliderVal.textContent = (current_E / 1e-7).toFixed(2);
+            fgValDisplay.textContent = toUiNum(F_G_PHYSICS, -26);
+            feValDisplay.textContent = toUiNum(physics_Fe, -26);
+
+            // Check for equilibrium (allow very small floating point diff)
+            // Or if slider is set *exactly* to the equilibrium integer value (102)
+            if (eFieldSlider.value == 102) {
+                physics_Fnet = 0; // Force exact zero for visual stability
+                isLevitating = true;
+                netForceDisplay.innerHTML = `0.00 <span class="unit">&times; 10<sup>-26</sup> N</span>`;
+                statusBadge.textContent = "Levitation Achieved";
+                statusBadge.className = "visible badge-levitate";
+            } else {
+                isLevitating = false;
+                let uiNet = (physics_Fnet / 1e-26).toFixed(2);
+                let sign = physics_Fnet > 0 ? "+" : "";
+                netForceDisplay.innerHTML = `${sign}${uiNet} <span class="unit">&times; 10<sup>-26</sup> N</span>`;
+                statusBadge.className = "";
+            }
+        }
+
+        // --- Main Animation Loop ---
+        const dt = 1; // arbitrary time step for animation visual speed
+
+        // Visual scaling factors (not to physical scale, for demonstration)
+        const accelScale = 0.05; 
+        const vectorScale = 4e26; // pixels per Newton (scaled for display)
+
+        function drawPlate(y, isPositive) {
+            ctx.fillStyle = isPositive ? colors.platePos : colors.plateNeg;
+            // Rounded rectangle for modern look
+            const r = 5;
+            const x = width * 0.1;
+            const w = width * 0.8;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + plateHeight);
+            ctx.lineTo(x + r, y + plateHeight);
+            ctx.quadraticCurveTo(x, y + plateHeight, x, y);
+            ctx.fill();
+
+            // Labels
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(isPositive ? "TOP PLATE (+)" : "BOTTOM PLATE (-)", width / 2, y + plateHeight/2);
+        }
+
+        function drawEFieldLines() {
+            if (current_E < 0.1e-7) return; // Don't draw if field is near 0
+
+            const yTop = plateMargin + plateHeight + 10;
+            const yBottom = height - plateMargin - 10;
+            const gap = yBottom - yTop;
+            
+            // Map E strength to opacity
+            const opacity = Math.min(0.5, (current_E / 2e-7));
+            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.lineWidth = 1;
+
+            const cols = 11;
+            for(let i=1; i<cols; i++) {
+                const x = width * 0.1 + (width*0.8/cols)*i;
+                ctx.beginPath();
+                ctx.moveTo(x, yTop);
+                ctx.lineTo(x, yBottom);
+                ctx.stroke();
+
+                // Simple arrow head pointing UP (+ to -)
+                ctx.beginPath();
+                ctx.moveTo(x - 3, yTop + 8);
+                ctx.lineTo(x, yTop);
+                ctx.lineTo(x + 3, yTop + 8);
+                ctx.stroke();
+            }
+        }
+
+        function drawVector(x, y, vy_pixels, color, label) {
+            if (Math.abs(vy_pixels) < 1) return;
+
+            const arrowHeadH = 8;
+            const labelMargin = 5;
+            
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + vy_pixels);
+            ctx.stroke();
+
+            // Arrow head
+            ctx.beginPath();
+            if (vy_pixels < 0) { // Pointing UP
+                ctx.moveTo(x - 5, y + vy_pixels + arrowHeadH);
+                ctx.lineTo(x, y + vy_pixels);
+                ctx.lineTo(x + 5, y + vy_pixels + arrowHeadH);
+                ctx.fillText(label, x + 10, y + vy_pixels/2);
+            } else { // Pointing DOWN
+                ctx.moveTo(x - 5, y + vy_pixels - arrowHeadH);
+                ctx.lineTo(x, y + vy_pixels);
+                ctx.lineTo(x + 5, y + vy_pixels - arrowHeadH);
+                ctx.fillText(label, x + 10, y + vy_pixels/2);
+            }
+            ctx.fill();
+
+            // Label
+            ctx.font = 'bold 13px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            
+        }
+
+        function drawProton() {
+            const px = proton.x;
+            const py = proton.y;
+            const r = proton.radius;
+
+            // Glow
+            const gradient = ctx.createRadialGradient(px, py, r*0.5, px, py, r*2.5);
+            gradient.addColorStop(0, colors.accent);
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(px, py, r*2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core
+            ctx.fillStyle = colors.accent;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Plus Sign
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+', px, py + 1);
+        }
+
+        function animate() {
+            // 1. Clear
+            ctx.clearRect(0, 0, width, height);
+
+            // 2. Physics Simulation update
+            if (isLevitating) {
+                proton.vy = 0; // Stop motion immediately
+            } else {
+                // Not physically accurate scaling, designed for good visual response to slider
+                const accelVisual = (physics_Fnet / M) * accelScale;
+                proton.vy += accelVisual * dt;
+                proton.y -= proton.vy * dt; // Canvas Y decreases going UP
+            }
+
+            // Boundary collision
+            if (proton.y < proton.limitTop) {
+                proton.y = proton.limitTop;
+                proton.vy = 0;
+            } else if (proton.y > proton.limitBottom) {
+                proton.y = proton.limitBottom;
+                proton.vy = 0;
+            }
+
+            // 3. Drawing Static Elements
+            drawEFieldLines();
+            drawPlate(plateMargin, true); // Top (+)
+            drawPlate(height - plateMargin - plateHeight, false); // Bottom (-)
+
+            // 4. Drawing Dynamic Elements (Vector offsets for visual separation)
+            // Fg (Purple, pointing DOWN)
+            drawVector(proton.x - 15, proton.y, F_G_PHYSICS * vectorScale, colors.forceG, 'Fg');
+            // Fe (Orange, pointing UP)
+            drawVector(proton.x + 15, proton.y, -physics_Fe * vectorScale, colors.forceE, 'Fe');
+
+            drawProton();
+
+            requestAnimationFrame(animate);
+        }
+
+        // --- Initialization ---
+        window.addEventListener('resize', resize);
+        eFieldSlider.addEventListener('input', updatePhysicsFromUI);
+
+        resize();
+        updatePhysicsFromUI(); // Initial physics calc
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>

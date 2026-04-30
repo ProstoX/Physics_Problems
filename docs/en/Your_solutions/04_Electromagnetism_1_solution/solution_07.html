@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electron Cyclotron Motion Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --e-field: rgba(239, 68, 68, 0.15);
+            --b-field: rgba(16, 185, 129, 0.1);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 10px 0;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .data-panel {
+            background-color: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            margin-top: 10px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-family: monospace;
+            font-size: 1.05rem;
+        }
+        
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .formula {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-family: monospace;
+        }
+
+        .constants {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: auto;
+            line-height: 1.5;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        }
+
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            background-color: #000;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div>
+            <h1>Control Panel</h1>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0;">Adjust fields and fire the electron.</p>
+        </div>
+
+        <div class="control-group">
+            <label for="voltageSlider">
+                <span>Voltage (V)</span>
+                <span id="vLabel">5000 V</span>
+            </label>
+            <input type="range" id="voltageSlider" min="1000" max="10000" step="100" value="5000">
+        </div>
+
+        <div class="control-group">
+            <label for="bfieldSlider">
+                <span>Magnetic Field (B)</span>
+                <span id="bLabel">0.10 T</span>
+            </label>
+            <input type="range" id="bfieldSlider" min="0.01" max="0.5" step="0.01" value="0.1">
+        </div>
+
+        <div class="data-panel">
+            <div class="formula">v = &radic;(2qV/m)</div>
+            <div class="data-row">
+                <span style="color: var(--text-muted)">Velocity:</span>
+                <span id="velocityDisplay">0.00e7 m/s</span>
+            </div>
+            <div style="height: 10px;"></div>
+            <div class="formula">r = mv/(qB)</div>
+            <div class="data-row">
+                <span style="color: var(--text-muted)">Radius:</span>
+                <span id="radiusDisplay">0.00 mm</span>
+            </div>
+        </div>
+
+        <button id="fireBtn">Fire Electron</button>
+
+        <div class="constants">
+            <strong>Constants:</strong><br>
+            Mass (m) = 9.11 &times; 10<sup>-31</sup> kg<br>
+            Charge (q) = 1.6 &times; 10<sup>-19</sup> C
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas" width="900" height="600"></canvas>
+    </div>
+
+    <script>
+        // Physics Constants
+        const q = 1.6e-19;
+        const m = 9.11e-31;
+        
+        // Canvas Setup
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const voltageSlider = document.getElementById('voltageSlider');
+        const bfieldSlider = document.getElementById('bfieldSlider');
+        const vLabel = document.getElementById('vLabel');
+        const bLabel = document.getElementById('bLabel');
+        const velocityDisplay = document.getElementById('velocityDisplay');
+        const radiusDisplay = document.getElementById('radiusDisplay');
+        const fireBtn = document.getElementById('fireBtn');
+
+        // Simulation parameters
+        let V = parseFloat(voltageSlider.value);
+        let B = parseFloat(bfieldSlider.value);
+        let v_calculated = 0;
+        let r_calculated = 0;
+
+        // Visual Layout Constants
+        const E_FIELD_WIDTH = 300; // Pixels dedicated to electric field zone
+        const PIXELS_PER_METER = 8000; // Scaling factor for visual representation
+        
+        // Particle State
+        let electron = {
+            active: false,
+            state: 'idle', // 'idle', 'accelerating', 'circling', 'done'
+            x: 0,
+            y: canvas.height / 2,
+            vx: 0,
+            trail: [],
+            cx: 0, 
+            cy: 0,
+            theta: 0,
+            omega: 0
+        };
+
+        const dt = 1.5e-11; // Simulation time step per frame
+
+        function updatePhysics() {
+            V = parseFloat(voltageSlider.value);
+            B = parseFloat(bfieldSlider.value);
+            
+            vLabel.textContent = `${V} V`;
+            bLabel.textContent = `${B.toFixed(2)} T`;
+
+            // Calculate exact physical values
+            v_calculated = Math.sqrt((2 * q * V) / m);
+            r_calculated = (m * v_calculated) / (q * B);
+
+            // Update UI displays
+            const vFormatted = (v_calculated / 1e7).toFixed(2);
+            velocityDisplay.textContent = `${vFormatted} × 10⁷ m/s`;
+            
+            const rFormatted = (r_calculated * 1000).toFixed(2); // Convert to mm
+            radiusDisplay.textContent = `${rFormatted} mm`;
+
+            // Redraw static background if idle
+            if (!electron.active) {
+                drawScene();
+            }
+        }
+
+        function fireElectron() {
+            electron.active = true;
+            electron.state = 'accelerating';
+            electron.x = 50; // Start slightly inside the E-field near cathode
+            electron.y = canvas.height / 2;
+            electron.vx = 0;
+            electron.trail = [];
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw E-Field Zone (Left)
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+            ctx.fillRect(0, 0, E_FIELD_WIDTH, canvas.height);
+            
+            // Draw Cathode (0V)
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(40, 50, 10, canvas.height - 100);
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '14px sans-serif';
+            ctx.fillText('0V (Cathode)', 10, 40);
+
+            // Draw Anode (+V)
+            ctx.fillStyle = '#94a3b8';
+            // Draw plate with slit in middle
+            ctx.fillRect(E_FIELD_WIDTH - 10, 50, 10, canvas.height/2 - 60);
+            ctx.fillRect(E_FIELD_WIDTH - 10, canvas.height/2 + 10, 10, canvas.height/2 - 60);
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText(`+${V}V (Anode)`, E_FIELD_WIDTH - 40, 40);
+
+            // Draw E-field lines
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.beginPath();
+            for(let y = 100; y < canvas.height - 50; y += 40) {
+                if(y > canvas.height/2 - 20 && y < canvas.height/2 + 20) continue; // Skip slit
+                ctx.moveTo(60, y);
+                ctx.lineTo(E_FIELD_WIDTH - 15, y);
+                // Arrow head
+                ctx.lineTo(E_FIELD_WIDTH - 25, y - 5);
+                ctx.moveTo(E_FIELD_WIDTH - 15, y);
+                ctx.lineTo(E_FIELD_WIDTH - 25, y + 5);
+            }
+            ctx.stroke();
+
+            // Draw B-Field Zone (Right)
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
+            ctx.fillRect(E_FIELD_WIDTH, 0, canvas.width - E_FIELD_WIDTH, canvas.height);
+            
+            ctx.fillStyle = '#10b981';
+            ctx.fillText('Uniform B-Field (Into Page ⊗)', E_FIELD_WIDTH + 20, 40);
+
+            // Draw B-field crosses
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+            ctx.lineWidth = 1.5;
+            for(let x = E_FIELD_WIDTH + 30; x < canvas.width; x += 40) {
+                for(let y = 50; y < canvas.height; y += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(x - 4, y - 4);
+                    ctx.lineTo(x + 4, y + 4);
+                    ctx.moveTo(x + 4, y - 4);
+                    ctx.lineTo(x - 4, y + 4);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawElectron() {
+            if (!electron.active && electron.state === 'idle') return;
+
+            // Draw trail
+            if (electron.trail.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2;
+                ctx.moveTo(electron.trail[0].x, electron.trail[0].y);
+                for (let i = 1; i < electron.trail.length; i++) {
+                    ctx.lineTo(electron.trail[i].x, electron.trail[i].y);
+                }
+                ctx.stroke();
+            }
+
+            // Draw glow
+            const gradient = ctx.createRadialGradient(electron.x, electron.y, 0, electron.x, electron.y, 10);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.4, 'rgba(56, 189, 248, 0.8)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(electron.x, electron.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawScene() {
+            drawBackground();
+            drawElectron();
+        }
+
+        function animate() {
+            if (electron.active) {
+                // Record trail
+                electron.trail.push({x: electron.x, y: electron.y});
+                if (electron.trail.length > 300) electron.trail.shift();
+
+                if (electron.state === 'accelerating') {
+                    // Electric Field = V / distance
+                    // Visual distance between plates is (E_FIELD_WIDTH - 50)
+                    const d_si = (E_FIELD_WIDTH - 50) / PIXELS_PER_METER;
+                    const E = V / d_si;
+                    const a = (q * E) / m;
+                    
+                    electron.vx += a * dt;
+                    electron.x += electron.vx * dt * PIXELS_PER_METER;
+
+                    if (electron.x >= E_FIELD_WIDTH) {
+                        electron.x = E_FIELD_WIDTH;
+                        electron.state = 'circling';
+                        
+                        // Setup circular motion
+                        electron.theta = -Math.PI / 2; // Starts moving purely in +x direction
+                        electron.omega = v_calculated / r_calculated;
+                        
+                        // Center of circle is "below" the entry point because Force is downwards
+                        // B into page (x), v right -> v x B is up, but q is negative -> Force is down
+                        electron.cy = electron.y + (r_calculated * PIXELS_PER_METER);
+                        electron.cx = E_FIELD_WIDTH;
+                    }
+                } 
+                else if (electron.state === 'circling') {
+                    electron.theta += electron.omega * dt;
+                    electron.x = electron.cx + r_calculated * PIXELS_PER_METER * Math.cos(electron.theta);
+                    electron.y = electron.cy + r_calculated * PIXELS_PER_METER * Math.sin(electron.theta);
+
+                    // End condition: If it completes a half circle and hits the plate, or goes off screen
+                    if (electron.theta > Math.PI / 2 || electron.y > canvas.height + 50 || electron.x > canvas.width + 50) {
+                        electron.state = 'done';
+                        electron.active = false;
+                    }
+                }
+            }
+
+            drawScene();
+            requestAnimationFrame(animate);
+        }
+
+        // Event Listeners
+        voltageSlider.addEventListener('input', updatePhysics);
+        bfieldSlider.addEventListener('input', updatePhysics);
+        fireBtn.addEventListener('click', fireElectron);
+
+        // Initialization
+        updatePhysics();
+        animate();
+    </script>
+</body>
+</html>

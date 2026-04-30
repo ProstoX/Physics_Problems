@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electric Field Vector Map</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --q1-color: #fca5a5;
+            --q2-color: #ef4444;
+            --e1-color: #fca5a5;
+            --e2-color: #ef4444;
+            --net-color: #38bdf8;
+            --null-color: #10b981;
+            --sensor-color: #facc15;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #sidebar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0 0 5px 0;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        p.subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0;
+            line-height: 1.4;
+        }
+
+        .data-panel {
+            background-color: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .data-panel h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 5px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-family: monospace;
+            font-size: 1rem;
+        }
+        
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .val-net { color: var(--net-color); font-weight: bold; }
+
+        .legend {
+            background-color: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .color-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        .info-box {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--null-color);
+            padding: 10px;
+            line-height: 1.5;
+            margin-top: auto;
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            cursor: crosshair;
+        }
+
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            background-color: #000;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div>
+            <h1>Electric Field Map</h1>
+            <p class="subtitle">Drag the yellow sensor to measure the electric field vectors around the +1q and +2q charges.</p>
+        </div>
+
+        <div class="data-panel">
+            <h3>Live Sensor Data</h3>
+            <div class="data-row">
+                <span style="color: var(--text-muted)">E<sub>x</sub>:</span>
+                <span id="exDisplay">0.00</span>
+            </div>
+            <div class="data-row">
+                <span style="color: var(--text-muted)">E<sub>y</sub>:</span>
+                <span id="eyDisplay">0.00</span>
+            </div>
+            <div class="data-row">
+                <span style="color: var(--text-muted)">|E<sub>net</sub>|:</span>
+                <span id="emagDisplay" class="val-net">0.00</span>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box" style="background: var(--e1-color);"></div>
+                <span>Field from +1q (E<sub>1</sub>)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: var(--e2-color);"></div>
+                <span>Field from +2q (E<sub>2</sub>)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: var(--net-color);"></div>
+                <span style="font-weight:bold;">Net Field (E<sub>net</sub>)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: var(--sensor-color); border-radius: 50%;"></div>
+                <span>Draggable Sensor</span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Equilibrium (Null) Point:</strong><br>
+            Highlighted in green. Positioned exactly at x = a(-3 + 2&radic;2), where the opposing electric fields perfectly cancel each other out (|E| = 0).
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="simCanvas" width="900" height="700"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Displays
+        const exDisplay = document.getElementById('exDisplay');
+        const eyDisplay = document.getElementById('eyDisplay');
+        const emagDisplay = document.getElementById('emagDisplay');
+
+        // Coordinate system parameters
+        const scale = 120; // pixels per unit 'a'
+        const originX = canvas.width / 2;
+        const originY = canvas.height / 2;
+
+        // Physics Setup
+        const a = 1.5; // distance from origin in units
+        const k_q = 5000; // Arbitrary constant scale for visual vectors
+
+        const q1 = { x: -a, y: 0, q: 1, color: '#fca5a5' };
+        const q2 = { x: a, y: 0, q: 2, color: '#ef4444' };
+
+        // Mathematical Null Point (where E = 0)
+        // Solved from: kq/(x+a)^2 = k(2q)/(a-x)^2
+        const nullPointX = a * (-3 + 2 * Math.sqrt(2));
+
+        // Sensor State
+        let sensor = {
+            x: 0, 
+            y: -1.5, // Initial position in grid units
+            radius: 8,
+            isDragging: false
+        };
+
+        // Utility: Convert Grid coordinates to Canvas coordinates
+        function toCanvasX(gridX) { return originX + gridX * scale; }
+        function toCanvasY(gridY) { return originY - gridY * scale; }
+
+        // Utility: Convert Canvas coordinates to Grid coordinates
+        function toGridX(canvasX) { return (canvasX - originX) / scale; }
+        function toGridY(canvasY) { return (originY - canvasY) / scale; }
+
+        // Draw an arrow vector
+        function drawArrow(fromX, fromY, toX, toY, color, width) {
+            const headlen = 10 + width; // Scaled head length
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 7), toY - headlen * Math.sin(angle - Math.PI / 7));
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 7), toY - headlen * Math.sin(angle + Math.PI / 7));
+            ctx.fill();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+
+            // Grid lines
+            for (let i = 0; i <= canvas.width; i += scale/2) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for (let i = 0; i <= canvas.height; i += scale/2) {
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            // Axes
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY); ctx.stroke(); // X
+            ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height); ctx.stroke(); // Y
+
+            // Axis Labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '12px monospace';
+            ctx.fillText("x", canvas.width - 20, originY - 10);
+            ctx.fillText("y", originX + 10, 20);
+        }
+
+        function drawCharge(charge, label) {
+            const cx = toCanvasX(charge.x);
+            const cy = toCanvasY(charge.y);
+            const radius = 15 + charge.q * 3; // Make larger charge slightly larger visually
+
+            // Glow
+            const gradient = ctx.createRadialGradient(cx, cy, radius*0.5, cx, cy, radius*2);
+            gradient.addColorStop(0, charge.color);
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius*2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core
+            ctx.fillStyle = charge.color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Plus Sign
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, cx, cy);
+        }
+
+        function drawNullPoint() {
+            const cx = toCanvasX(nullPointX);
+            const cy = toCanvasY(0);
+
+            // Pulsing ring effect based on time
+            const time = Date.now() / 300;
+            const pulse = 10 + Math.sin(time) * 3;
+
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Crosshair marker
+            ctx.beginPath();
+            ctx.moveTo(cx - 5, cy); ctx.lineTo(cx + 5, cy);
+            ctx.moveTo(cx, cy - 5); ctx.lineTo(cx, cy + 5);
+            ctx.stroke();
+
+            ctx.fillStyle = '#10b981';
+            ctx.font = '12px monospace';
+            ctx.fillText("E=0", cx, cy - 20);
+        }
+
+        function calculateField(qSource, targetX, targetY) {
+            const dx = targetX - qSource.x;
+            const dy = targetY - qSource.y;
+            const r2 = dx*dx + dy*dy;
+            const r = Math.sqrt(r2);
+            
+            if (r < 0.05) return { ex: 0, ey: 0 }; // Prevent infinity if placed exactly on top
+
+            const eMag = (k_q * qSource.q) / r2;
+            return {
+                ex: eMag * (dx / r),
+                ey: eMag * (dy / r)
+            };
+        }
+
+        function renderScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawGrid();
+            drawNullPoint();
+            drawCharge(q1, '+1q');
+            drawCharge(q2, '+2q');
+
+            // Calculate Fields
+            const e1 = calculateField(q1, sensor.x, sensor.y);
+            const e2 = calculateField(q2, sensor.x, sensor.y);
+            
+            const netEx = e1.ex + e2.ex;
+            const netEy = e1.ey + e2.ey;
+            const netMag = Math.sqrt(netEx*netEx + netEy*netEy);
+
+            // Update UI Data Panel
+            exDisplay.textContent = netEx.toFixed(1);
+            eyDisplay.textContent = netEy.toFixed(1);
+            emagDisplay.textContent = netMag.toFixed(1);
+
+            // Draw Vectors from Sensor
+            const sx = toCanvasX(sensor.x);
+            const sy = toCanvasY(sensor.y);
+
+            // Visual capping so vectors don't blow up screen when too close to charges
+            const maxVisualLength = 200;
+            const capVector = (vx, vy) => {
+                const mag = Math.sqrt(vx*vx + vy*vy);
+                if (mag > maxVisualLength) {
+                    return { x: (vx/mag)*maxVisualLength, y: (vy/mag)*maxVisualLength };
+                }
+                return { x: vx, y: vy };
+            };
+
+            const v1 = capVector(e1.ex, -e1.ey); // Invert Y for canvas drawing
+            const v2 = capVector(e2.ex, -e2.ey);
+            const vNet = capVector(netEx, -netEy);
+
+            // Draw E1
+            drawArrow(sx, sy, sx + v1.x, sy + v1.y, '#fca5a5', 2);
+            // Draw E2
+            drawArrow(sx, sy, sx + v2.x, sy + v2.y, '#ef4444', 2);
+            // Draw Net E
+            drawArrow(sx, sy, sx + vNet.x, sy + vNet.y, '#38bdf8', 4);
+
+            // Draw Sensor
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(sx, sy, sensor.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            requestAnimationFrame(renderScene);
+        }
+
+        // --- Interaction Logic ---
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (evt.clientX - rect.left) * scaleX,
+                y: (evt.clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            const sx = toCanvasX(sensor.x);
+            const sy = toCanvasY(sensor.y);
+            const dist = Math.sqrt((pos.x - sx)**2 + (pos.y - sy)**2);
+            
+            // Give a generous hitbox for grabbing
+            if (dist < 25) {
+                sensor.isDragging = true;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (sensor.isDragging) {
+                const pos = getMousePos(e);
+                sensor.x = toGridX(pos.x);
+                sensor.y = toGridY(pos.y);
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            sensor.isDragging = false;
+            canvas.style.cursor = 'crosshair';
+        });
+
+        // Touch support for mobile devices
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent scrolling
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            const mouseEvent = new MouseEvent('mouseup');
+            window.dispatchEvent(mouseEvent);
+        });
+
+        // Start Loop
+        requestAnimationFrame(renderScene);
+
+    </script>
+</body>
+</html>

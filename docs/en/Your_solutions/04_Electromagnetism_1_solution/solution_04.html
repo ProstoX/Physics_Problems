@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electric vs Gravitational Force</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+            --panel-bg: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-top: 0;
+        }
+
+        /* Atom Visualizer */
+        .atom-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 30px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .orbit {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            animation: spin 4s linear infinite;
+        }
+
+        .proton {
+            width: 20px;
+            height: 20px;
+            background-color: var(--accent-red);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--accent-red);
+            z-index: 2;
+        }
+
+        .electron {
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background-color: var(--accent-blue);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-blue);
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Controls */
+        .controls {
+            background: rgba(0,0,0,0.2);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--accent-green);
+        }
+
+        /* Results Grid */
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .result-card {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .result-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            color: #94a3b8;
+        }
+
+        .result-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .ratio-card {
+            grid-column: 1 / -1;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--accent-green);
+        }
+
+        .ratio-card .result-value {
+            color: var(--accent-green);
+            font-size: 2rem;
+        }
+
+        /* Logarithmic Stacking Visual */
+        .visual-stack-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .stack-description {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .blocks {
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .block {
+            width: 250px;
+            height: 40px;
+            background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #60a5fa;
+            opacity: 0;
+            animation: stackIn 0.5s forwards;
+        }
+
+        .block.half {
+            height: 20px;
+            background: linear-gradient(90deg, #064e3b, #10b981);
+            border-color: #34d399;
+        }
+
+        @keyframes stackIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Quantum Scale: Electrostatics vs Gravity</h1>
+    
+    <div class="atom-container">
+        <div class="proton"></div>
+        <div class="orbit" id="orbit-ring">
+            <div class="electron"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="slider-group">
+            <label for="distance-slider">
+                Orbital Distance (r): <span id="distance-val" style="font-family: monospace;">5.29e-11</span> m
+            </label>
+            <input type="range" id="distance-slider" min="1" max="100" value="5.29" step="0.1">
+            <small style="color: #64748b; text-align: center;">(1 to 100 times 10⁻¹¹ meters)</small>
+        </div>
+    </div>
+
+    <div class="results">
+        <div class="result-card">
+            <h3>Electric Force (Fe)</h3>
+            <div class="result-value" id="fe-val">...</div>
+        </div>
+        <div class="result-card">
+            <h3>Gravitational Force (Fg)</h3>
+            <div class="result-value" id="fg-val">...</div>
+        </div>
+        <div class="result-card ratio-card">
+            <h3>Ratio (Fe / Fg)</h3>
+            <div class="result-value" id="ratio-val">...</div>
+        </div>
+    </div>
+
+    <div class="visual-stack-container">
+        <div class="stack-description">
+            <strong>Visualizing the Ratio:</strong> Each block below represents a multiplication by <strong>1,000,000</strong> (10<sup>6</sup>). Notice that as you change the distance, the absolute forces change, but the stack representing the ratio remains completely static.
+        </div>
+        <div class="blocks" id="blocks-container">
+            <!-- Blocks injected via JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Constants
+    const k = 8.98755e9;       // Coulomb's constant (N m²/C²)
+    const G = 6.67430e-11;     // Gravitational constant (N m²/kg²)
+    const q = 1.60217e-19;     // Elementary charge (C)
+    const me = 9.10938e-31;    // Electron mass (kg)
+    const mp = 1.67262e-27;    // Proton mass (kg)
+
+    // DOM Elements
+    const distanceSlider = document.getElementById('distance-slider');
+    const distanceValDisplay = document.getElementById('distance-val');
+    const feValDisplay = document.getElementById('fe-val');
+    const fgValDisplay = document.getElementById('fg-val');
+    const ratioValDisplay = document.getElementById('ratio-val');
+    const orbitRing = document.getElementById('orbit-ring');
+    const blocksContainer = document.getElementById('blocks-container');
+
+    // Scientific notation formatter
+    function formatSci(num) {
+        return num.toExponential(2).replace('e+', ' × 10^').replace('e', ' × 10^');
+    }
+
+    function buildStackVisual(ratioExponent) {
+        blocksContainer.innerHTML = '';
+        
+        // Each full block represents 10^6
+        const fullBlocks = Math.floor(ratioExponent / 6);
+        const remainder = ratioExponent % 6;
+
+        let totalDelay = 0;
+
+        // Base block (Gravity)
+        const baseBlock = document.createElement('div');
+        baseBlock.className = 'block';
+        baseBlock.style.background = '#334155';
+        baseBlock.style.borderColor = '#475569';
+        baseBlock.style.color = '#94a3b8';
+        baseBlock.innerHTML = `Base: Gravity (1)`;
+        blocksContainer.appendChild(baseBlock);
+
+        // Build Full Multiplier Blocks
+        for (let i = 1; i <= fullBlocks; i++) {
+            const block = document.createElement('div');
+            block.className = 'block';
+            block.style.animationDelay = `${totalDelay}s`;
+            block.innerHTML = `× 1,000,000 (10<sup>${i * 6}</sup>)`;
+            blocksContainer.appendChild(block);
+            totalDelay += 0.15;
+        }
+
+        // Build Partial Remainder Block if exists
+        if (remainder > 0) {
+            const partialBlock = document.createElement('div');
+            partialBlock.className = 'block half';
+            partialBlock.style.animationDelay = `${totalDelay}s`;
+            partialBlock.innerHTML = `× 10<sup>${remainder.toFixed(1)}</sup>`;
+            blocksContainer.appendChild(partialBlock);
+        }
+    }
+
+    function calculateForces() {
+        // Get distance in meters
+        const rValue = parseFloat(distanceSlider.value);
+        const r = rValue * 1e-11;
+        
+        // Update distance display
+        distanceValDisplay.textContent = r.toExponential(2).replace('e', 'e');
+
+        // Calculate visual orbit size mapping (aesthetic scaling)
+        const baseScale = 200; // Base px size
+        const scaledWidth = Math.max(50, Math.min(baseScale * (rValue / 5.29), 350));
+        orbitRing.style.width = `${scaledWidth}px`;
+        orbitRing.style.height = `${scaledWidth}px`;
+
+        // Calculate Forces
+        const fe = (k * q * q) / (r * r);
+        const fg = (G * me * mp) / (r * r);
+        const ratio = fe / fg;
+
+        // Update displays
+        feValDisplay.textContent = formatSci(fe) + ' N';
+        fgValDisplay.textContent = formatSci(fg) + ' N';
+        ratioValDisplay.textContent = formatSci(ratio);
+    }
+
+    // Event Listeners
+    distanceSlider.addEventListener('input', calculateForces);
+
+    // Initial Setup
+    calculateForces();
+    
+    // The ratio is independent of distance: (k*q^2) / (G*me*mp)
+    // ≈ 2.27 × 10^39. So the exponent is ~39.3.
+    const staticRatio = (k * q * q) / (G * me * mp);
+    const exponent = Math.log10(staticRatio);
+    buildStackVisual(exponent);
+
+</script>
+</body>
+</html>

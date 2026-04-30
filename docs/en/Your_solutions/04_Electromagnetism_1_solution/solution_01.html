@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coulomb's Law: Vector Cancellation</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --positive-color: #ff5252;
+            --negative-color: #448aff;
+            --arrow-color: #9e9e9e;
+            --success-color: #4caf50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            margin: 0;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h2 {
+            text-align: center;
+            font-weight: 300;
+            margin-top: 0;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        .visualization {
+            display: flex;
+            justify-content: center;
+            background-color: #0a0a0a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            margin-bottom: 20px;
+        }
+
+        svg {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+        }
+
+        .panel {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .panel-title {
+            text-transform: uppercase;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+
+        .formula-text {
+            font-style: italic;
+            color: #aaa;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+        }
+
+        .force-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .force-item {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        .net-force {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid var(--success-color);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .net-force h3 {
+            margin: 0 0 5px 0;
+            color: var(--success-color);
+            font-size: 1.5rem;
+            text-transform: uppercase;
+        }
+
+        .net-force p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        /* SVG Element Styles */
+        .square-line { stroke: #555; stroke-width: 2; fill: none; }
+        .arrow-line { stroke: var(--arrow-color); stroke-width: 3; fill: none; opacity: 0.7; }
+        text { font-family: sans-serif; }
+        .charge-text { fill: #fff; font-size: 14px; font-weight: bold; text-anchor: middle; dominant-baseline: central; }
+        .label-text { fill: #aaa; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Force Vector Superposition</h2>
+
+        <div class="visualization">
+            <svg viewBox="0 0 400 400" id="canvas">
+                <defs>
+                    <!-- Arrowhead Marker -->
+                    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+                        markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--arrow-color)" />
+                    </marker>
+                </defs>
+
+                <!-- 1.0m Square (Scaled visually to 240x240 px) -->
+                <!-- Origin starts at (80, 80) and goes to (320, 320) -->
+                <rect x="80" y="80" width="240" height="240" class="square-line" />
+
+                <!-- Distance Labels -->
+                <text x="200" y="70" class="label-text" text-anchor="middle">1.0 m</text>
+                <text x="200" y="340" class="label-text" text-anchor="middle">1.0 m</text>
+                <text x="65" y="200" class="label-text" text-anchor="end" dominant-baseline="central">1.0 m</text>
+                <text x="335" y="200" class="label-text" text-anchor="start" dominant-baseline="central">1.0 m</text>
+
+                <!-- Arrows (Drawn from center pointing towards corners) -->
+                <!-- Center is at (200, 200). Corners at (80,80), (320,80), (320,320), (80,320) -->
+                <!-- We shorten the lines slightly so they don't overlap the circles -->
+                <line x1="200" y1="200" x2="105" y2="105" class="arrow-line" marker-end="url(#arrow)" />
+                <line x1="200" y1="200" x2="295" y2="105" class="arrow-line" marker-end="url(#arrow)" />
+                <line x1="200" y1="200" x2="295" y2="295" class="arrow-line" marker-end="url(#arrow)" />
+                <line x1="200" y1="200" x2="105" y2="295" class="arrow-line" marker-end="url(#arrow)" />
+
+                <!-- Force Labels next to arrows -->
+                <text x="140" y="130" class="label-text" fill="var(--arrow-color)">F_TL</text>
+                <text x="260" y="130" class="label-text" fill="var(--arrow-color)">F_TR</text>
+                <text x="260" y="275" class="label-text" fill="var(--arrow-color)">F_BR</text>
+                <text x="140" y="275" class="label-text" fill="var(--arrow-color)">F_BL</text>
+
+                <!-- Corner Charges (+1.0 C) -->
+                <!-- Top Left -->
+                <circle cx="80" cy="80" r="16" fill="var(--positive-color)" />
+                <text x="80" y="80" class="charge-text">+</text>
+                <text x="80" y="50" class="label-text" fill="var(--positive-color)" text-anchor="middle">+1.0 C</text>
+
+                <!-- Top Right -->
+                <circle cx="320" cy="80" r="16" fill="var(--positive-color)" />
+                <text x="320" y="80" class="charge-text">+</text>
+                <text x="320" y="50" class="label-text" fill="var(--positive-color)" text-anchor="middle">+1.0 C</text>
+
+                <!-- Bottom Right -->
+                <circle cx="320" cy="320" r="16" fill="var(--positive-color)" />
+                <text x="320" y="320" class="charge-text">+</text>
+                <text x="320" y="350" class="label-text" fill="var(--positive-color)" text-anchor="middle">+1.0 C</text>
+
+                <!-- Bottom Left -->
+                <circle cx="80" cy="320" r="16" fill="var(--positive-color)" />
+                <text x="80" y="320" class="charge-text">+</text>
+                <text x="80" y="350" class="label-text" fill="var(--positive-color)" text-anchor="middle">+1.0 C</text>
+
+                <!-- Center Charge (-2.0 C) -->
+                <circle cx="200" cy="200" r="20" fill="var(--negative-color)" />
+                <text x="200" y="200" class="charge-text">-</text>
+                <text x="235" y="200" class="label-text" fill="var(--negative-color)" dominant-baseline="central">-2.0 C</text>
+            </svg>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">Force Analysis</div>
+            <div class="formula-text">Individual Force Magnitudes (F = k|q₁q₂| / r²)</div>
+            
+            <div class="force-grid" id="force-grid">
+                <!-- Populated by JS -->
+            </div>
+
+            <div class="net-force">
+                <h3>Net Force: 0 N</h3>
+                <p>Explanation: Due to exact vector cancellation, the symmetric attractive forces pulling outward perfectly balance out.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Physics Constants
+        const k = 8.98755e9; // N m^2 / C^2
+        const sideLength = 1.0; // meters
+        const qCorner = 1.0; // C
+        const qCenter = 2.0; // C (Magnitude)
+
+        // Calculate distance from center to a corner (half the diagonal)
+        // r = sqrt( (0.5)^2 + (0.5)^2 ) = sqrt(0.5)
+        const rSquared = Math.pow(sideLength / 2, 2) * 2; 
+
+        // Calculate single force magnitude
+        const forceMagnitude = (k * qCorner * qCenter) / rSquared;
+
+        // Format to scientific notation (e.g., 3.60 x 10^10)
+        function formatForce(f) {
+            return f.toExponential(2).replace('e+', ' &times; 10<sup>') + '</sup> N';
+        }
+
+        const formattedForce = formatForce(forceMagnitude);
+
+        // Inject into grid
+        const grid = document.getElementById('force-grid');
+        const corners = ['TL', 'TR', 'BL', 'BR'];
+
+        corners.forEach(corner => {
+            const div = document.createElement('div');
+            div.className = 'force-item';
+            div.innerHTML = `F<sub>${corner}</sub> = ${formattedForce}`;
+            grid.appendChild(div);
+        });
+    </script>
+</body>
+</html>
