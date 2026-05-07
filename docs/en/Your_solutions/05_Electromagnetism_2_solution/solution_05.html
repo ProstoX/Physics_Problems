@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parallel-Plate Capacitor</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent: #4fc3f7;
+            --plate-color: #b0bec5;
+            --field-color: #ffee58;
+            --positive: #ef5350;
+            --negative: #42a5f5;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Left Panel */
+        .panel-left {
+            width: 350px;
+            background-color: var(--panel-bg);
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--accent);
+            font-size: 1.5rem;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .control-header span {
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .number-input {
+            width: 60px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-align: right;
+        }
+
+        /* Outputs */
+        .outputs {
+            margin-top: auto;
+            background: #111;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .output-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+
+        .output-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .output-val {
+            font-family: monospace;
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+
+        /* Right Panel */
+        .panel-right {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #2a2a2a 0%, #121212 100%);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="panel-left">
+            <h2>Parallel-Plate Capacitor</h2>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="slider-area">Plate Area (S) [m&sup2;]</label>
+                    <input type="number" id="num-area" class="number-input" min="0.001" max="0.1" step="0.001" value="0.02">
+                </div>
+                <input type="range" id="slider-area" min="0.001" max="0.1" step="0.001" value="0.02">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="slider-dist">Distance (d) [mm]</label>
+                    <input type="number" id="num-dist" class="number-input" min="1" max="20" step="0.1" value="5">
+                </div>
+                <input type="range" id="slider-dist" min="1" max="20" step="0.1" value="5">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="slider-volt">Voltage (V) [V]</label>
+                    <input type="number" id="num-volt" class="number-input" min="0" max="1000" step="1" value="500">
+                </div>
+                <input type="range" id="slider-volt" min="0" max="1000" step="1" value="500">
+            </div>
+
+            <div class="outputs">
+                <div class="output-row">
+                    <span>Capacitance (C)</span>
+                    <span id="out-c" class="output-val">0.00 pF</span>
+                </div>
+                <div class="output-row">
+                    <span>Stored Energy (U)</span>
+                    <span id="out-u" class="output-val">0.00 &mu;J</span>
+                </div>
+                <div class="output-row">
+                    <span>Electric Field (E)</span>
+                    <span id="out-e" class="output-val">0.00 kV/m</span>
+                </div>
+                <div class="output-row">
+                    <span>Force (F)</span>
+                    <span id="out-f" class="output-val">0.00 mN</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel-right" id="canvas-container">
+            <canvas id="capCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Physics Constants
+        const e0 = 8.854e-12; // Permittivity of free space (F/m)
+
+        // DOM Elements
+        const sliderS = document.getElementById('slider-area');
+        const numS = document.getElementById('num-area');
+        const sliderD = document.getElementById('slider-dist');
+        const numD = document.getElementById('num-dist');
+        const sliderV = document.getElementById('slider-volt');
+        const numV = document.getElementById('num-volt');
+
+        const outC = document.getElementById('out-c');
+        const outU = document.getElementById('out-u');
+        const outE = document.getElementById('out-e');
+        const outF = document.getElementById('out-f');
+
+        const canvas = document.getElementById('capCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        let width, height;
+
+        // Sync Sliders and Number Inputs
+        function syncInputs(slider, numBox) {
+            slider.addEventListener('input', () => {
+                numBox.value = slider.value;
+                update();
+            });
+            numBox.addEventListener('input', () => {
+                let val = parseFloat(numBox.value);
+                if(val < parseFloat(slider.min)) val = slider.min;
+                if(val > parseFloat(slider.max)) val = slider.max;
+                slider.value = val;
+                update();
+            });
+        }
+
+        syncInputs(sliderS, numS);
+        syncInputs(sliderD, numD);
+        syncInputs(sliderV, numV);
+
+        // Handle Canvas Resize
+        function resize() {
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+            update();
+        }
+
+        window.addEventListener('resize', resize);
+
+        // Drawing utility for arrows
+        function drawArrow(x1, y1, x2, y2, opacity) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255, 238, 88, ${opacity})`;
+            ctx.lineWidth = 2;
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            // Arrowhead
+            const headlen = 8; 
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(255, 238, 88, ${opacity})`;
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.fill();
+        }
+
+        // Main Update Loop
+        function update() {
+            // Get Values
+            const S = parseFloat(sliderS.value); // m^2
+            const d = parseFloat(sliderD.value); // mm
+            const d_m = d * 1e-3; // meters
+            const V = parseFloat(sliderV.value); // V
+
+            // Physics Calculations
+            const C = e0 * (S / d_m); // Farads
+            const U = 0.5 * C * Math.pow(V, 2); // Joules
+            const E = V / d_m; // V/m
+            const F = U / d_m; // Newtons
+
+            // Update DOM Outputs
+            outC.textContent = (C * 1e12).toFixed(2) + ' pF';
+            outU.textContent = (U * 1e6).toFixed(2) + ' \u03BCJ';
+            outE.textContent = (E / 1e3).toFixed(2) + ' kV/m';
+            outF.textContent = (F * 1e3).toFixed(2) + ' mN';
+
+            // --- Drawing ---
+            ctx.clearRect(0, 0, width, height);
+
+            // Visual Mappings
+            // Center of screen
+            const cx = width / 2;
+            const cy = height / 2;
+
+            // Map physical to pixels
+            // Area 0.001 to 0.1 m^2 -> width 200px to 600px
+            const plateWidth = 200 + ((S - 0.001) / 0.099) * 400; 
+            const plateHeight = 15; // Fixed thickness for visual clarity
+
+            // Distance 1mm to 20mm -> Gap 20px to 300px
+            const gap = 20 + ((d - 1) / 19) * 280;
+
+            const topY = cy - gap / 2 - plateHeight;
+            const bottomY = cy + gap / 2;
+
+            // Draw Electric Field Lines
+            if (V > 0) {
+                // Number of lines maps to Area, Intensity/Opacity maps to E field
+                const numLines = Math.floor(plateWidth / 30);
+                const startX = cx - plateWidth / 2 + 15;
+                const spacing = (plateWidth - 30) / (numLines - 1 || 1);
+                
+                // Max theoretical E is 1000V / 0.001m = 1,000,000 V/m
+                const maxE = 1000000;
+                // Base opacity + scaled opacity
+                const opacity = Math.min(1, 0.1 + (E / maxE) * 0.9);
+
+                for (let i = 0; i < numLines; i++) {
+                    const x = startX + i * spacing;
+                    drawArrow(x, topY + plateHeight, x, bottomY, opacity);
+                }
+            }
+
+            // Draw Top Plate
+            ctx.fillStyle = '#b0bec5';
+            ctx.fillRect(cx - plateWidth / 2, topY, plateWidth, plateHeight);
+            
+            // Draw Bottom Plate
+            ctx.fillRect(cx - plateWidth / 2, bottomY, plateWidth, plateHeight);
+
+            // Draw Charges
+            const chargeDensity = Math.min(1, (C * V) / (1e-9)); // Normalized scaling factor based on charge
+            if (V > 0 && chargeDensity > 0.01) {
+                const numCharges = Math.max(1, Math.floor(chargeDensity * (plateWidth / 20)));
+                const chargeSpacing = plateWidth / (numCharges + 1);
+
+                ctx.font = '16px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                for (let i = 1; i <= numCharges; i++) {
+                    const cx_pos = (cx - plateWidth / 2) + i * chargeSpacing;
+                    
+                    // Positive charges on top
+                    ctx.fillStyle = '#ef5350';
+                    ctx.fillText('+', cx_pos, topY + plateHeight / 2);
+                    
+                    // Negative charges on bottom
+                    ctx.fillStyle = '#42a5f5';
+                    ctx.fillText('-', cx_pos, bottomY + plateHeight / 2);
+                }
+            }
+        }
+
+        // Initialize
+        resize();
+    </script>
+</body>
+</html>

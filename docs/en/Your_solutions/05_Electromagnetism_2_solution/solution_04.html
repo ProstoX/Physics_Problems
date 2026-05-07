@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magnetic Torque on a Loop</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111; /* Dark clean background */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(30, 30, 30, 0.85);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+            width: 320px;
+            border: 1px solid #444;
+            backdrop-filter: blur(4px);
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 1px solid #555;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        #output-panel {
+            background: #000;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            border: 1px solid #333;
+        }
+        .legend {
+            font-size: 0.8rem;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Magnetic Torque on a Loop</h2>
+        
+        <div class="control-group">
+            <label>Current (I) <span id="val-i">2.0 A</span></label>
+            <input type="range" id="slider-i" min="0" max="5" step="0.1" value="2">
+        </div>
+        
+        <div class="control-group">
+            <label>Magnetic Field (B) <span id="val-b">0.30 T</span></label>
+            <input type="range" id="slider-b" min="0.1" max="1.0" step="0.05" value="0.3">
+        </div>
+        
+        <div class="control-group">
+            <label>Loop Angle (&theta;) <span id="val-angle">0&deg;</span></label>
+            <input type="range" id="slider-angle" min="0" max="360" step="1" value="0">
+        </div>
+
+        <div id="output-panel">
+            <!-- Dynamic calculation goes here -->
+        </div>
+
+        <div class="legend">
+            <div><span class="legend-color" style="background: #00aaff;"></span> B-Field (Magnetic Field)</div>
+            <div><span class="legend-color" style="background: #ffff00;"></span> Current Flow (I)</div>
+            <div><span class="legend-color" style="background: #00ff00;"></span> Area Vector (A)</div>
+            <div><span class="legend-color" style="background: #ff5500;"></span> Torque Vector (&tau;)</div>
+        </div>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- 1. Scene Setup ---
+        const scene = new THREE.Scene();
+        // Dark grey to help perception of depth
+        scene.background = new THREE.Color(0x111111);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 15, 30);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // --- 2. Visual Elements ---
+        
+        // A. Magnetic Field (B) - uniform horizontal arrows pointing +X
+        const bFieldGroup = new THREE.Group();
+        const bDir = new THREE.Vector3(1, 0, 0);
+        const bColor = 0x00aaff;
+        for(let y = -10; y <= 10; y += 5) {
+            for(let z = -10; z <= 10; z += 5) {
+                const arrow = new THREE.ArrowHelper(bDir, new THREE.Vector3(-15, y, z), 30, bColor, 1, 0.5);
+                // Make B field arrows semi-transparent
+                arrow.line.material.transparent = true;
+                arrow.line.material.opacity = 0.3;
+                arrow.cone.material.transparent = true;
+                arrow.cone.material.opacity = 0.3;
+                bFieldGroup.add(arrow);
+            }
+        }
+        scene.add(bFieldGroup);
+
+        // B. Current Loop Assembly
+        const loopAssembly = new THREE.Group();
+        
+        // Loop Dimensions (visual scaling 1 unit = 1cm for drawing)
+        // 10cm x 5cm (Length along Z = 10, Width along X = 5)
+        const lZ = 10; 
+        const lX = 5;
+        const actualArea = 0.10 * 0.05; // 0.005 m^2
+
+        // The wireframe loop (lying in XZ plane initially)
+        const loopGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-lX/2, 0, -lZ/2),
+            new THREE.Vector3(lX/2, 0, -lZ/2),
+            new THREE.Vector3(lX/2, 0, lZ/2),
+            new THREE.Vector3(-lX/2, 0, lZ/2),
+            new THREE.Vector3(-lX/2, 0, -lZ/2) // close loop
+        ]);
+        const loopMaterial = new THREE.LineBasicMaterial({ color: 0xaaaaaa, linewidth: 2 });
+        const loop = new THREE.Line(loopGeometry, loopMaterial);
+        loopAssembly.add(loop);
+
+        // Current arrows (I) moving along the wire edges
+        const iColor = 0xffff00;
+        const currentArrows = [];
+        
+        // Helper to add current arrow on an edge
+        function addCurrentArrow(startPt, endPt) {
+            const dir = new THREE.Vector3().subVectors(endPt, startPt).normalize();
+            const mid = new THREE.Vector3().addVectors(startPt, endPt).multiplyScalar(0.5);
+            const arrow = new THREE.ArrowHelper(dir, mid, 2, iColor, 0.8, 0.5);
+            loopAssembly.add(arrow);
+            currentArrows.push(arrow);
+        }
+
+        // Add 4 current arrows on the edges
+        addCurrentArrow(new THREE.Vector3(-lX/2, 0, -lZ/2), new THREE.Vector3(lX/2, 0, -lZ/2));
+        addCurrentArrow(new THREE.Vector3(lX/2, 0, -lZ/2), new THREE.Vector3(lX/2, 0, lZ/2));
+        addCurrentArrow(new THREE.Vector3(lX/2, 0, lZ/2), new THREE.Vector3(-lX/2, 0, lZ/2));
+        addCurrentArrow(new THREE.Vector3(-lX/2, 0, lZ/2), new THREE.Vector3(-lX/2, 0, -lZ/2));
+
+        // Area Vector (A) - points perpendicular to the face (+Y initially)
+        const aDir = new THREE.Vector3(0, 1, 0);
+        const aColor = 0x00ff00;
+        const areaArrow = new THREE.ArrowHelper(aDir, new THREE.Vector3(0,0,0), 6, aColor, 1.2, 0.6);
+        loopAssembly.add(areaArrow);
+
+        scene.add(loopAssembly);
+
+        // C. Torque Indicator (Tau) - Vector at origin representing torque axis
+        const tauColor = 0xff5500;
+        const torqueArrow = new THREE.ArrowHelper(new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,0), 0.1, tauColor, 1.2, 0.6);
+        scene.add(torqueArrow);
+
+        // Add a subtle grid to establish floor plane
+        const grid = new THREE.GridHelper(30, 30, 0x333333, 0x222222);
+        grid.position.y = -10;
+        scene.add(grid);
+
+
+        // --- 3. Interaction and Calculation Logic ---
+        const sI = document.getElementById('slider-i');
+        const sB = document.getElementById('slider-b');
+        const sAngle = document.getElementById('slider-angle');
+        const vI = document.getElementById('val-i');
+        const vB = document.getElementById('val-b');
+        const vAngle = document.getElementById('val-angle');
+        const output = document.getElementById('output-panel');
+
+        function updateScene() {
+            const I = parseFloat(sI.value);
+            const B = parseFloat(sB.value);
+            const angleDeg = parseFloat(sAngle.value);
+
+            // Update Labels
+            vI.innerHTML = I.toFixed(1) + ' A';
+            vB.innerHTML = B.toFixed(2) + ' T';
+            vAngle.innerHTML = angleDeg + '&deg;';
+
+            // Rotate the loop assembly around the Z axis.
+            // 0 deg = plane is parallel to B (B is along X). 
+            // Loop starts flat in XZ plane, so it is already parallel to B.
+            // Rotating around Z tilts the Area vector away from Y axis toward X axis.
+            loopAssembly.rotation.z = THREE.MathUtils.degToRad(angleDeg);
+
+            // Hide current arrows if I = 0
+            currentArrows.forEach(arrow => {
+                arrow.visible = (I > 0);
+            });
+
+            // Calculate exact physical vectors for math
+            // Base Area vector was (0,1,0). Let's apply the current loop rotation.
+            const currentAreaVec = new THREE.Vector3(0, 1, 0).applyEuler(loopAssembly.rotation).normalize();
+            const bVec = new THREE.Vector3(1, 0, 0); // B is always along +X
+            
+            // Torque vector = Magnetic Dipole Moment x B
+            // Dipole Moment (mu) = I * Area * currentAreaVec
+            // Torque = mu x B
+            const muVec = currentAreaVec.clone().multiplyScalar(I * actualArea);
+            const tauVec = new THREE.Vector3().crossVectors(muVec, bVec);
+            
+            // Length of B for the formula
+            const torqueMag = tauVec.length() * B; 
+            
+            // Update Torque Indicator Arrow in Scene
+            if (torqueMag < 0.00001) {
+                torqueArrow.visible = false;
+            } else {
+                torqueArrow.visible = true;
+                const tauDir = tauVec.clone().normalize();
+                torqueArrow.setDirection(tauDir);
+                // Scale arrow length for visual purposes based on torque magnitude
+                torqueArrow.setLength(Math.max(3, torqueMag * 2000), 1, 0.5);
+            }
+
+            // Calculate angle between Area Vector and B-Field for the equation display
+            let thetaRad = currentAreaVec.angleTo(bVec);
+            let thetaDeg = THREE.MathUtils.radToDeg(thetaRad);
+
+            // Calculate Torque Value using the standard scalar formula: T = I * A * B * sin(theta)
+            const T = I * actualArea * B * Math.sin(thetaRad);
+
+            // Update Dynamic Math Output
+            output.innerHTML = 
+                `&tau; = I &times; A &times; B &times; sin(&theta;)<br><br>` +
+                `<span style="color:#aaa;">A = 0.1m &times; 0.05m = 0.005 m&sup2;</span><br>` +
+                `&tau; = ${I.toFixed(1)} &times; 0.005 &times; ${B.toFixed(2)} &times; sin(${thetaDeg.toFixed(0)}&deg;)<br><br>` +
+                `<strong style="color:#ff5500; font-size:1.1rem;">&tau; = ${T.toFixed(5)} N&middot;m</strong>`;
+        }
+
+        // Add event listeners to sliders
+        sI.addEventListener('input', updateScene);
+        sB.addEventListener('input', updateScene);
+        sAngle.addEventListener('input', updateScene);
+
+        // Initial setup
+        updateScene();
+
+        // --- 4. Render Loop ---
+        window.addEventListener('resize', onWindowResize, false);
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

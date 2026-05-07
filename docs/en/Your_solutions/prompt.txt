@@ -1,2 +1,2 @@
-Write a solution in markdown format. Explain each step. Explain shortly what which letter stands for and in which units measured. Write a prompt which I will use for another AI to create a HTML vizualization.
+Write a solution in markdown format. Explain each step. Explain shortly in the beginning what which letter stands for and in which units measured. Write a prompt which I will use for another AI to create a single-file HTML vizualization.
 Problem: 

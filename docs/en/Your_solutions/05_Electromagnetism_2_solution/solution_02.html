@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ampere's Law: Parallel Wires</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(30, 30, 35, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 320px;
+            z-index: 10;
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; color: #4da6ff; }
+        .control-group { margin-bottom: 15px; }
+        label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .output {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #555;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Ampere's Law: Parallel Wires</h2>
+        
+        <div class="control-group">
+            <label><span>Wire 1 Current (I₁):</span> <span id="val-i1">5 A</span></label>
+            <input type="range" id="i1" min="-10" max="10" step="0.1" value="5">
+        </div>
+        
+        <div class="control-group">
+            <label><span>Wire 2 Current (I₂):</span> <span id="val-i2">-5 A</span></label>
+            <input type="range" id="i2" min="-10" max="10" step="0.1" value="-5">
+        </div>
+        
+        <div class="control-group">
+            <label><span>Distance (d):</span> <span id="val-d">10 cm</span></label>
+            <input type="range" id="d" min="5" max="20" step="0.5" value="10">
+        </div>
+
+        <div class="output">
+            <span>Midpoint B-Field:</span>
+            <span id="val-b">0.00 µT</span>
+        </div>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const mu0 = 4 * Math.PI * 1e-7;
+
+        // UI Elements
+        const i1Slider = document.getElementById('i1');
+        const i2Slider = document.getElementById('i2');
+        const dSlider = document.getElementById('d');
+        const valI1 = document.getElementById('val-i1');
+        const valI2 = document.getElementById('val-i2');
+        const valD = document.getElementById('val-d');
+        const valB = document.getElementById('val-b');
+
+        let width, height, centerX, centerY;
+        const pxPerCm = 15; // Scale: 15 pixels = 1 cm
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            centerX = width / 2;
+            centerY = height / 2;
+            draw();
+        }
+        window.addEventListener('resize', resize);
+
+        // Attach listeners to sliders
+        [i1Slider, i2Slider, dSlider].forEach(el => {
+            el.addEventListener('input', draw);
+        });
+
+        function calculateB(x, y, wireX, wireY, I) {
+            const dx = x - wireX;
+            const dy = y - wireY;
+            const r2 = dx * dx + dy * dy;
+            if (r2 < 100) return { bx: 0, by: 0 }; // Avoid singularity at the wire
+            
+            // Distance in meters
+            const r = Math.sqrt(r2) / pxPerCm / 100; 
+            const bMag = (mu0 * Math.abs(I)) / (2 * Math.PI * r);
+            
+            // Direction based on Right Hand Rule (Positive I = Out of screen)
+            // If out of screen, B field is counter-clockwise
+            const sign = Math.sign(I);
+            const bx = sign * (-dy / Math.sqrt(r2)) * bMag;
+            const by = sign * (dx / Math.sqrt(r2)) * bMag;
+            
+            return { bx, by };
+        }
+
+        function drawArrow(x, y, bx, by, scale, isMidpoint = false) {
+            const bMag = Math.sqrt(bx*bx + by*by);
+            if (bMag === 0) return;
+
+            // Map magnitude to visual length and opacity
+            const logMag = Math.log10(bMag * 1e6 + 1); // scale microTeslas
+            const visualLength = isMidpoint ? 40 : Math.min(logMag * 10, 25);
+            
+            const dx = (bx / bMag) * visualLength;
+            const dy = (by / bMag) * visualLength;
+
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + dx, y + dy);
+            
+            // Arrowhead
+            const angle = Math.atan2(dy, dx);
+            const headlen = isMidpoint ? 10 : 5;
+            ctx.lineTo(x + dx - headlen * Math.cos(angle - Math.PI / 6), y + dy - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(x + dx, y + dy);
+            ctx.lineTo(x + dx - headlen * Math.cos(angle + Math.PI / 6), y + dy - headlen * Math.sin(angle + Math.PI / 6));
+
+            if (isMidpoint) {
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 3;
+                ctx.globalAlpha = 1.0;
+            } else {
+                ctx.strokeStyle = '#88ccff';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = Math.min(logMag / 2, 0.8);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1.0; // Reset
+        }
+
+        function drawWire(x, y, I, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 12, 0, 2 * Math.PI);
+            ctx.fillStyle = '#222';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            if (I > 0) {
+                // Out of screen (dot)
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+            } else if (I < 0) {
+                // Into screen (X)
+                ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y + 5);
+                ctx.moveTo(x + 5, y - 5); ctx.lineTo(x - 5, y + 5);
+                ctx.stroke();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            const I1 = parseFloat(i1Slider.value);
+            const I2 = parseFloat(i2Slider.value);
+            const d = parseFloat(dSlider.value); // cm
+
+            valI1.textContent = I1.toFixed(1) + ' A';
+            valI2.textContent = I2.toFixed(1) + ' A';
+            valD.textContent = d.toFixed(1) + ' cm';
+
+            const wire1X = centerX - (d / 2) * pxPerCm;
+            const wire2X = centerX + (d / 2) * pxPerCm;
+
+            // Draw Vector Field Grid
+            const gridSpacing = 35;
+            for (let x = gridSpacing/2; x < width; x += gridSpacing) {
+                for (let y = gridSpacing/2; y < height; y += gridSpacing) {
+                    const b1 = calculateB(x, y, wire1X, centerY, I1);
+                    const b2 = calculateB(x, y, wire2X, centerY, I2);
+                    drawArrow(x, y, b1.bx + b2.bx, b1.by + b2.by, false);
+                }
+            }
+
+            // Draw Midpoint Indicator and Vector
+            const mb1 = calculateB(centerX, centerY, wire1X, centerY, I1);
+            const mb2 = calculateB(centerX, centerY, wire2X, centerY, I2);
+            const netBx = mb1.bx + mb2.bx;
+            const netBy = mb1.by + mb2.by;
+            
+            // Draw midpoint dot
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffd700';
+            ctx.fill();
+
+            // Draw midpoint arrow
+            drawArrow(centerX, centerY, netBx, netBy, true, true);
+
+            // Draw Wires
+            drawWire(wire1X, centerY, I1, '#ff4d4d');
+            drawWire(wire2X, centerY, I2, '#4dff4d');
+
+            // Update UI Output
+            const netBMag = Math.sqrt(netBx*netBx + netBy*netBy);
+            const microTeslas = netBMag * 1e6;
+            valB.textContent = microTeslas.toFixed(2) + ' µT';
+        }
+
+        // Initialize
+        resize();
+    </script>
+</body>
+</html>

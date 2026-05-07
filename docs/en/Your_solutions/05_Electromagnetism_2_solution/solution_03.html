@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biot-Savart Law Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #eee;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(30, 30, 30, 0.85);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #555;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            width: 320px;
+            z-index: 100;
+        }
+        h2 {
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+            color: #4da6ff;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 1rem;
+            color: #00ffcc;
+            text-align: center;
+        }
+    </style>
+    <!-- Import Maps for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h2>Biot-Savart Law Visualization</h2>
+        
+        <div class="control-group">
+            <label>Current I (A): <span id="val-I">3</span></label>
+            <input type="range" id="slider-I" min="1" max="10" step="0.1" value="3">
+        </div>
+        
+        <div class="control-group">
+            <label>Distance r (m): <span id="val-r">0.2</span></label>
+            <input type="range" id="slider-r" min="0.1" max="0.5" step="0.01" value="0.2">
+        </div>
+        
+        <div class="control-group">
+            <label>Angle &theta; (&deg;): <span id="val-theta">90</span></label>
+            <input type="range" id="slider-theta" min="0" max="180" step="1" value="90">
+        </div>
+
+        <div id="output">dB = 0.00 T</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // 1. Scene Setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10);
+        camera.position.set(0.5, 0.5, 0.8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // Dark Grid Background
+        const gridHelper = new THREE.GridHelper(2, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        // 2. Visual Elements
+        const dlLength = 0.1;
+        
+        // Wire Segment (dl)
+        const wireGeometry = new THREE.CylinderGeometry(0.005, 0.005, dlLength, 16);
+        const wireMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+        const wireMesh = new THREE.Mesh(wireGeometry, wireMaterial);
+        scene.add(wireMesh);
+
+        // Current Arrow (I)
+        const currentDir = new THREE.Vector3(0, 1, 0);
+        const currentOrigin = new THREE.Vector3(0, -dlLength/2, 0);
+        const currentArrow = new THREE.ArrowHelper(currentDir, currentOrigin, dlLength, 0xff4444, 0.02, 0.01);
+        scene.add(currentArrow);
+
+        // Point P
+        const sphereGeo = new THREE.SphereGeometry(0.01, 16, 16);
+        const sphereMat = new THREE.MeshBasicMaterial({ color: 0x4da6ff });
+        const pointP = new THREE.Mesh(sphereGeo, sphereMat);
+        scene.add(pointP);
+
+        // Position Vector (r) Dashed Line
+        const lineMaterial = new THREE.LineDashedMaterial({ color: 0xaaaaaa, dashSize: 0.01, gapSize: 0.005 });
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]);
+        const rLine = new THREE.Line(lineGeometry, lineMaterial);
+        scene.add(rLine);
+
+        // Magnetic Field Vector (dB)
+        const dbDir = new THREE.Vector3(0, 0, 1); // Will calculate
+        const dbArrow = new THREE.ArrowHelper(dbDir, new THREE.Vector3(0,0,0), 0.1, 0x00ffcc, 0.02, 0.01);
+        scene.add(dbArrow);
+
+        // 3. UI Interactions & Math
+        const sliderI = document.getElementById('slider-I');
+        const sliderR = document.getElementById('slider-r');
+        const sliderTheta = document.getElementById('slider-theta');
+        const valI = document.getElementById('val-I');
+        const valR = document.getElementById('val-r');
+        const valTheta = document.getElementById('val-theta');
+        const output = document.getElementById('output');
+
+        function updateScene() {
+            const I = parseFloat(sliderI.value);
+            const r = parseFloat(sliderR.value);
+            const thetaDeg = parseFloat(sliderTheta.value);
+            
+            // Update labels
+            valI.innerText = I.toFixed(1);
+            valR.innerText = r.toFixed(2);
+            valTheta.innerText = thetaDeg;
+
+            const thetaRad = THREE.MathUtils.degToRad(thetaDeg);
+
+            // Calculate Position of P (in XY plane for simplicity)
+            const px = r * Math.sin(thetaRad);
+            const py = r * Math.cos(thetaRad);
+            const pz = 0;
+            const pPos = new THREE.Vector3(px, py, pz);
+            
+            pointP.position.copy(pPos);
+
+            // Update Dashed Line
+            lineGeometry.setFromPoints([new THREE.Vector3(0, 0, 0), pPos]);
+            rLine.computeLineDistances(); // Required for dashed lines
+
+            // Calculate dB Magnitude: dB = (1e-7) * I * dl * sin(theta) / r^2
+            const dbMag = (1e-7) * I * dlLength * Math.sin(thetaRad) / (r * r);
+            
+            // Format output (e.g., 1.50e-7 T)
+            output.innerText = `dB = ${dbMag.toExponential(2)} T`;
+
+            // Calculate dB Direction: dl x r
+            // dl is along Y-axis: (0, 1, 0)
+            // r is (px, py, 0)
+            // Cross product dl x r = (0, 0, -px) -> Along -Z axis
+            const rVector = pPos.clone().normalize();
+            const dlVector = new THREE.Vector3(0, 1, 0);
+            
+            const crossVec = new THREE.Vector3().crossVectors(dlVector, rVector);
+            
+            // If crossVec length is 0 (theta = 0 or 180), hide arrow
+            if (crossVec.lengthSq() < 0.0001) {
+                dbArrow.visible = false;
+            } else {
+                dbArrow.visible = true;
+                crossVec.normalize();
+                
+                // Scale arrow visually based on relative magnitude (purely for visual aid)
+                // Normalize visual scale so max possible value looks okay
+                const maxDb = (1e-7) * 10 * dlLength * 1 / (0.1 * 0.1);
+                const visualScale = 0.05 + (dbMag / maxDb) * 0.15;
+
+                dbArrow.position.copy(pPos);
+                dbArrow.setDirection(crossVec);
+                dbArrow.setLength(visualScale, visualScale * 0.2, visualScale * 0.1);
+            }
+        }
+
+        // Event Listeners
+        sliderI.addEventListener('input', updateScene);
+        sliderR.addEventListener('input', updateScene);
+        sliderTheta.addEventListener('input', updateScene);
+
+        // Initial setup
+        updateScene();
+
+        // 4. Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

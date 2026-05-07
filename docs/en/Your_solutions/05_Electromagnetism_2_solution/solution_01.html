@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gauss's Law Visualization</title>
+    <style>
+        /* CSS Reset and Canvas Setup */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        /* UI Overlay Styling */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(15, 15, 25, 0.85); /* Semi-transparent dark */
+            color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            max-width: 300px;
+            pointer-events: none; /* Allows mouse events to pass through to the 3D canvas */
+        }
+        #ui-panel h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.25rem;
+            color: #4da6ff;
+            letter-spacing: 0.5px;
+        }
+        .data-row {
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .data-value {
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .note {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #cccccc;
+            line-height: 1.5;
+            border-top: 1px solid #444;
+            padding-top: 15px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Overlay -->
+    <div id="ui-panel">
+        <h2>Gauss's Law Visualization</h2>
+        <div class="data-row">
+            <span>Enclosed Charge:</span> 
+            <span class="data-value">+2 C</span>
+        </div>
+        <div class="data-row">
+            <span>Radius:</span> 
+            <span class="data-value">1 m</span>
+        </div>
+        <div class="data-row">
+            <span>Total Flux (&Phi;<sub>E</sub>):</span> 
+            <span class="data-value">~2.26 &times; 10<sup>11</sup> N&middot;m&sup2;/C</span>
+        </div>
+        <div class="note">
+            The total flux passing through the sphere depends only on the enclosed charge, not the sphere's radius.
+        </div>
+    </div>
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // 1. Scene, Camera, and Renderer Setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050510); // Space-like dark background
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(2, 1.5, 2.5); // Position camera to get a good initial angle
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // 2. OrbitControls Setup
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // Adds smooth interaction
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 0.5;
+        controls.maxDistance = 10;
+
+        // 3. Center Point Charge (+2C)
+        const chargeRadius = 0.05;
+        const chargeGeometry = new THREE.SphereGeometry(chargeRadius, 32, 32);
+        const chargeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const chargeMesh = new THREE.Mesh(chargeGeometry, chargeMaterial);
+        scene.add(chargeMesh);
+
+        // Subtle glowing aura for the charge
+        const glowGeometry = new THREE.SphereGeometry(chargeRadius * 2, 32, 32);
+        const glowMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff3333, 
+            transparent: true, 
+            opacity: 0.4,
+            blending: THREE.AdditiveBlending // Makes the glow appear brighter
+        });
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        scene.add(glowMesh);
+
+        // 4. Gaussian Surface (Transparent Wireframe Sphere)
+        const gaussianRadius = 1;
+        const gaussianGeometry = new THREE.SphereGeometry(gaussianRadius, 48, 48); // High segment count for smooth sphere
+        const gaussianMaterial = new THREE.MeshBasicMaterial({
+            color: 0x88ccff, // Light blue
+            wireframe: true,
+            transparent: true,
+            opacity: 0.15
+        });
+        const gaussianMesh = new THREE.Mesh(gaussianGeometry, gaussianMaterial);
+        scene.add(gaussianMesh);
+
+        // 5. Electric Field Lines (Arrows radiating outward)
+        const numArrows = 60; 
+        const arrowLength = 1.35; // Extending past the 1m radius sphere
+        const arrowColor = 0xffd700; // Gold/Yellow
+        const origin = new THREE.Vector3(0, 0, 0);
+
+        // Generate evenly distributed points using a Fibonacci sphere algorithm
+        for (let i = 0; i < numArrows; i++) {
+            const phi = Math.acos(1 - 2 * (i + 0.5) / numArrows);
+            const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+
+            const dir = new THREE.Vector3(
+                Math.cos(theta) * Math.sin(phi),
+                Math.cos(phi), // Y-up axis in Three.js
+                Math.sin(theta) * Math.sin(phi)
+            );
+            dir.normalize(); // Ensure the direction vector has a length of 1
+
+            // parameters: dir, origin, length, color, headLength, headWidth
+            const arrowHelper = new THREE.ArrowHelper(dir, origin, arrowLength, arrowColor, 0.15, 0.08);
+            scene.add(arrowHelper);
+        }
+
+        // 6. Window Resize Event Listener
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // 7. Animation Loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+
+            // Animate the pulsing glow effect
+            const pulseScale = 1 + 0.2 * Math.sin(elapsedTime * 4);
+            glowMesh.scale.set(pulseScale, pulseScale, pulseScale);
+            
+            // Slowly rotate the Gaussian surface to add a dynamic feel
+            gaussianMesh.rotation.y += 0.001;
+            gaussianMesh.rotation.x += 0.0005;
+
+            // Required if controls.enableDamping is true
+            controls.update();
+
+            renderer.render(scene, camera);
+        }
+
+        // Start the animation
+        animate();
+    </script>
+</body>
+</html>

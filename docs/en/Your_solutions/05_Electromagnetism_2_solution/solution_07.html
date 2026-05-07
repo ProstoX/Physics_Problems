@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visible Light Spectrum</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid var(--border-color);
+        }
+
+        h2 {
+            margin: 0 0 20px 0;
+            text-align: center;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        #color-display {
+            width: 100%;
+            height: 180px;
+            border-radius: 12px;
+            background-color: #000;
+            margin-bottom: 25px;
+            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.05s ease;
+        }
+
+        .data-panel {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px 20px;
+            border-radius: 8px;
+        }
+
+        .data-item {
+            text-align: center;
+        }
+
+        .data-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .data-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .unit {
+            font-size: 1rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .controls {
+            position: relative;
+            padding-top: 15px;
+        }
+
+        /* The visual spectrum gradient */
+        .gradient-bar {
+            width: 100%;
+            height: 24px;
+            border-radius: 12px;
+            background: linear-gradient(to right, 
+                rgb(75, 0, 130) 0%,     /* 380nm - Violet */
+                rgb(0, 0, 255) 16.2%,   /* 440nm - Blue */
+                rgb(0, 255, 255) 32.4%, /* 500nm - Cyan */
+                rgb(0, 255, 0) 45.9%,   /* 550nm - Green */
+                rgb(255, 255, 0) 56.7%, /* 590nm - Yellow */
+                rgb(255, 127, 0) 64.8%, /* 620nm - Orange */
+                rgb(255, 0, 0) 100%     /* 750nm - Red */
+            );
+            position: relative;
+            margin-bottom: -12px; /* Overlap with slider */
+            pointer-events: none; /* Let clicks pass through to slider */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Marker on the gradient */
+        #marker {
+            position: absolute;
+            top: -4px;
+            bottom: -4px;
+            width: 4px;
+            background-color: white;
+            border-radius: 2px;
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+            transform: translateX(-50%);
+            transition: left 0.05s ease;
+        }
+
+        /* Invisible slider overlaid on the gradient */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+            position: relative;
+            z-index: 10;
+            margin: 0;
+            cursor: ew-resize;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        /* Custom thumb to act as a hit-target, completely transparent */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 32px;
+            width: 24px;
+            background: transparent;
+            cursor: ew-resize;
+        }
+
+        input[type=range]::-moz-range-thumb {
+            height: 32px;
+            width: 24px;
+            background: transparent;
+            border: none;
+            cursor: ew-resize;
+        }
+        
+        .labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Visible Light Spectrum</h2>
+    
+    <div id="color-display"></div>
+    
+    <div class="data-panel">
+        <div class="data-item">
+            <div class="data-label">Wavelength</div>
+            <div class="data-value"><span id="wl-val">550</span> <span class="unit">nm</span></div>
+        </div>
+        <div class="data-item">
+            <div class="data-label">Frequency</div>
+            <div class="data-value"><span id="freq-val">545.1</span> <span class="unit">THz</span></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="gradient-bar">
+            <div id="marker"></div>
+        </div>
+        <input type="range" id="slider" min="380" max="750" value="550" step="1">
+        <div class="labels">
+            <span>380 nm (UV)</span>
+            <span>750 nm (IR)</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const slider = document.getElementById('slider');
+    const colorDisplay = document.getElementById('color-display');
+    const wlVal = document.getElementById('wl-val');
+    const freqVal = document.getElementById('freq-val');
+    const marker = document.getElementById('marker');
+
+    // Speed of light in m/s
+    const C = 299792458;
+
+    /**
+     * Converts a given wavelength in nm to an RGB color string.
+     * Uses a widely accepted approximation (Dan Bruton's algorithm).
+     */
+    function wavelengthToRGB(wavelength) {
+        let r = 0, g = 0, b = 0;
+
+        if (wavelength >= 380 && wavelength < 440) {
+            r = -(wavelength - 440) / (440 - 380);
+            b = 1.0;
+        } else if (wavelength >= 440 && wavelength < 490) {
+            g = (wavelength - 440) / (490 - 440);
+            b = 1.0;
+        } else if (wavelength >= 490 && wavelength < 510) {
+            g = 1.0;
+            b = -(wavelength - 510) / (510 - 490);
+        } else if (wavelength >= 510 && wavelength < 580) {
+            r = (wavelength - 510) / (580 - 510);
+            g = 1.0;
+        } else if (wavelength >= 580 && wavelength < 645) {
+            r = 1.0;
+            g = -(wavelength - 645) / (645 - 580);
+        } else if (wavelength >= 645 && wavelength <= 780) {
+            r = 1.0;
+        }
+
+        // Intensity fall-off near vision limits
+        let factor = 1.0;
+        if (wavelength >= 380 && wavelength < 420) {
+            factor = 0.3 + 0.7 * (wavelength - 380) / (420 - 380);
+        } else if (wavelength >= 701 && wavelength <= 780) {
+            factor = 0.3 + 0.7 * (780 - wavelength) / (780 - 700);
+        }
+
+        const gamma = 0.8;
+        const R = r === 0 ? 0 : Math.round(255 * Math.pow(r * factor, gamma));
+        const G = g === 0 ? 0 : Math.round(255 * Math.pow(g * factor, gamma));
+        const B = b === 0 ? 0 : Math.round(255 * Math.pow(b * factor, gamma));
+
+        return `rgb(${R}, ${G}, ${B})`;
+    }
+
+    function updateVisualization() {
+        const wl = parseFloat(slider.value);
+        
+        // 1. Update text values
+        wlVal.textContent = wl;
+        
+        // Calculate frequency: f = c / lambda
+        // (299,792,458 m/s) / (wl * 10^-9 m) = f in Hz
+        // Convert Hz to THz (* 10^-12) -> f (THz) = 299792.458 / wl
+        const freqTHz = 299792.458 / wl;
+        freqVal.textContent = freqTHz.toFixed(1);
+
+        // 2. Update color block
+        const color = wavelengthToRGB(wl);
+        colorDisplay.style.backgroundColor = color;
+        
+        // Add a subtle glow matching the color to the box shadow
+        colorDisplay.style.boxShadow = `0 0 30px ${color.replace('rgb', 'rgba').replace(')', ', 0.3)')}`;
+
+        // 3. Update marker position
+        const percent = ((wl - 380) / (750 - 380)) * 100;
+        marker.style.left = `${percent}%`;
+    }
+
+    // Event listeners
+    slider.addEventListener('input', updateVisualization);
+
+    // Initial render
+    updateVisualization();
+</script>
+
+</body>
+</html>

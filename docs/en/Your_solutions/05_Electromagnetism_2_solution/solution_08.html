@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Electromagnetic Spectrum</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --panel-bg: #161b22;
+            --text-color: #c9d1d9;
+            --border-color: #30363d;
+            --accent: #58a6ff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+            width: 100%;
+            max-width: 900px;
+            border: 1px solid var(--border-color);
+        }
+
+        h2 {
+            margin: 0 0 25px 0;
+            text-align: center;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: 1px;
+        }
+
+        /* Spectrum Visual Band */
+        .spectrum-container {
+            position: relative;
+            width: 100%;
+            height: 60px;
+            display: flex;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+            margin-bottom: 5px;
+        }
+
+        .region {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            border-right: 1px solid rgba(255,255,255,0.2);
+            box-sizing: border-box;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        }
+        .region:last-child {
+            border-right: none;
+        }
+
+        /* Interactive Slider */
+        .slider-wrapper {
+            position: relative;
+            margin-bottom: 40px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            margin: 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid var(--accent);
+            cursor: pointer;
+            margin-top: -9px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        /* Data Readout Panel */
+        .data-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .data-label {
+            font-size: 0.85rem;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .data-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Canvas Animation */
+        .canvas-container {
+            background: #000;
+            border-radius: 8px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+        
+        .canvas-label {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 120px;
+            border-radius: 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>The Electromagnetic Spectrum</h2>
+    
+    <div class="spectrum-container" id="spectrum-band">
+        <!-- Regions injected via JS -->
+    </div>
+
+    <div class="slider-wrapper">
+        <!-- Slider ranges 0 to 100 mapped non-linearly to exponents -->
+        <input type="range" id="spectrum-slider" min="0" max="100" value="50" step="0.1">
+    </div>
+
+    <div class="data-panel">
+        <div class="data-item">
+            <div class="data-label">Region</div>
+            <div class="data-value" id="val-region" style="color: var(--accent);">Visible Light</div>
+        </div>
+        <div class="data-item">
+            <div class="data-label">Wavelength (&lambda;)</div>
+            <div class="data-value" id="val-wavelength">5.00 &times; 10<sup>-7</sup> m</div>
+        </div>
+        <div class="data-item">
+            <div class="data-label">Frequency (f)</div>
+            <div class="data-value" id="val-frequency">6.00 &times; 10<sup>14</sup> Hz</div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <div class="canvas-label">Wave Representation</div>
+        <canvas id="wave-canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    // --- Data Configuration & Physics Mapping ---
+    // We map a 0-100 slider to visually friendly widths for the regions, 
+    // and tie them to their actual scientific exponent boundaries (Wavelength in meters: 10^x).
+    const regions = [
+        { name: "Gamma Rays", pct: 15, expStart: -16, expEnd: -11, color: "#2d004b" },
+        { name: "X-Rays", pct: 15, expStart: -11, expEnd: -8, color: "#542788" },
+        { name: "Ultraviolet", pct: 12, expStart: -8, expEnd: -6.4, color: "#8073ac" },
+        // Visible light is scientifically very narrow, we expand it visually here for interaction
+        { name: "Visible", pct: 16, expStart: -6.4, expEnd: -6.15, color: "linear-gradient(to right, #8a2be2, #0000ff, #00ffff, #00ff00, #ffff00, #ff7f00, #ff0000)" },
+        { name: "Infrared", pct: 14, expStart: -6.15, expEnd: -3, color: "#b2182b" },
+        { name: "Microwaves", pct: 14, expStart: -3, expEnd: -1, color: "#d6604d" },
+        { name: "Radio Waves", pct: 14, expStart: -1, expEnd: 4, color: "#f4a582" }
+    ];
+
+    const SPEED_OF_LIGHT = 299792458; // m/s
+
+    // DOM Elements
+    const bandContainer = document.getElementById('spectrum-band');
+    const slider = document.getElementById('spectrum-slider');
+    const valRegion = document.getElementById('val-region');
+    const valWavelength = document.getElementById('val-wavelength');
+    const valFreq = document.getElementById('val-frequency');
+    const canvas = document.getElementById('wave-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // State
+    let currentSliderValue = 50;
+    let animationPhase = 0;
+
+    // --- Initialization ---
+    function initSpectrumBand() {
+        let cumulativePct = 0;
+        regions.forEach((region, index) => {
+            // Append boundaries to region object for easy lookup
+            region.sliderStart = cumulativePct;
+            cumulativePct += region.pct;
+            region.sliderEnd = cumulativePct;
+
+            // Create DOM element for the color band
+            const div = document.createElement('div');
+            div.className = 'region';
+            div.style.width = `${region.pct}%`;
+            div.style.background = region.color;
+            div.innerText = region.name;
+            bandContainer.appendChild(div);
+        });
+    }
+
+    function resizeCanvas() {
+        // Adjust resolution for crisp rendering
+        canvas.width = canvas.parentElement.clientWidth - 20; 
+        canvas.height = 120;
+    }
+
+    // --- Math & Formatting ---
+    function getSpectrumData(sliderVal) {
+        // Find which region the slider is in
+        let activeRegion = regions[regions.length - 1]; // Default to last
+        for (let r of regions) {
+            if (sliderVal >= r.sliderStart && sliderVal <= r.sliderEnd) {
+                activeRegion = r;
+                break;
+            }
+        }
+
+        // Interpolate the exponent based on slider position within that region
+        const localPct = (sliderVal - activeRegion.sliderStart) / (activeRegion.sliderEnd - activeRegion.sliderStart);
+        const currentExp = activeRegion.expStart + (localPct * (activeRegion.expEnd - activeRegion.expStart));
+        
+        const wavelength = Math.pow(10, currentExp);
+        const frequency = SPEED_OF_LIGHT / wavelength;
+
+        return {
+            regionName: activeRegion.name,
+            wavelength: wavelength,
+            frequency: frequency,
+            activeColor: activeRegion.name === "Visible" ? "#00ffff" : activeRegion.color
+        };
+    }
+
+    function formatScientific(val, unit) {
+        let exp = Math.floor(Math.log10(val));
+        let mantissa = val / Math.pow(10, exp);
+        
+        // Handle floating point quirks
+        if (mantissa < 1) { mantissa *= 10; exp -= 1; }
+        
+        return `${mantissa.toFixed(2)} &times; 10<sup>${exp}</sup> ${unit}`;
+    }
+
+    function getCommonUnit(wavelength) {
+        // Provide a human-readable supplement for wavelength
+        if (wavelength < 1e-11) return "(pm scale)";
+        if (wavelength >= 1e-9 && wavelength < 1e-6) return `(${(wavelength * 1e9).toFixed(0)} nm)`;
+        if (wavelength >= 1e-6 && wavelength < 1e-3) return `(${(wavelength * 1e6).toFixed(1)} &mu;m)`;
+        if (wavelength >= 1e-3 && wavelength < 1) return `(${(wavelength * 1000).toFixed(1)} mm)`;
+        if (wavelength >= 1 && wavelength < 1000) return `(${wavelength.toFixed(1)} m)`;
+        return "(km scale)";
+    }
+
+    // --- Core Update Loop ---
+    function updateUI() {
+        currentSliderValue = parseFloat(slider.value);
+        const data = getSpectrumData(currentSliderValue);
+
+        valRegion.innerText = data.regionName;
+        
+        // Extract solid color from gradient if visible light
+        if(data.regionName === 'Visible') {
+             valRegion.style.color = 'var(--accent)';
+        } else {
+             valRegion.style.color = data.activeColor;
+        }
+
+        valWavelength.innerHTML = `${formatScientific(data.wavelength, 'm')} <br><span style="font-size:0.8em; color:#888;">${getCommonUnit(data.wavelength)}</span>`;
+        valFreq.innerHTML = formatScientific(data.frequency, 'Hz');
+    }
+
+    function animateWave() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Map slider (0-100) to visual frequency (High frequency -> tight waves, Low frequency -> loose waves)
+        // Gamma (0) = ~60 visual waves, Radio (100) = ~0.5 visual waves
+        const visualFreq = 60 * Math.pow(0.008, currentSliderValue / 100); 
+        
+        // Animation speed scales with frequency to feel natural
+        const speed = 0.05 + (visualFreq * 0.005);
+        animationPhase -= speed;
+
+        ctx.beginPath();
+        const amplitude = canvas.height * 0.35;
+        const centerY = canvas.height / 2;
+
+        for (let x = 0; x < canvas.width; x++) {
+            // Sine wave formula: y = A * sin(B*x + C)
+            const y = centerY + Math.sin((x / canvas.width) * visualFreq * Math.PI * 2 + animationPhase) * amplitude;
+            
+            if (x === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+
+        // Style the wave based on position
+        const data = getSpectrumData(currentSliderValue);
+        ctx.strokeStyle = data.regionName === "Visible" ? "#00ffff" : data.activeColor;
+        
+        // Brighten up the dark colors so they show well on black canvas
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Reset shadow for next frame
+        ctx.shadowBlur = 0;
+
+        requestAnimationFrame(animateWave);
+    }
+
+    // --- Listeners ---
+    slider.addEventListener('input', updateUI);
+    window.addEventListener('resize', resizeCanvas);
+
+    // Bootstrap
+    initSpectrumBand();
+    resizeCanvas();
+    updateUI();
+    animateWave();
+
+</script>
+</body>
+</html>
