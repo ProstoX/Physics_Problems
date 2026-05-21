@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Circuit Solver</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --surface-color: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            
+            /* Educational Color Coding */
+            --c-path-a: #2563eb; /* Blue */
+            --c-path-b: #16a34a; /* Green */
+            --c-path-r: #9333ea; /* Purple */
+            --c-path-bot: #ea580c; /* Orange */
+            --c-step3: #0284c7;  /* Light Blue/Teal */
+            --c-step5: #4f46e5;  /* Indigo */
+            --c-step6: #e11d48;  /* Rose */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.125rem;
+        }
+
+        /* --- SVG Diagram Styles --- */
+        .diagram-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 500px;
+        }
+
+        .svg-lbl {
+            font-weight: 700;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .node-lbl {
+            font-weight: 800;
+            font-size: 14px;
+            fill: #475569;
+            letter-spacing: 1px;
+        }
+
+        /* --- Layout for Controls --- */
+        .controls-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 860px) {
+            .controls-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+            color: var(--text-main);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        /* --- Inputs Section --- */
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-left: 5px solid #ccc;
+            border-radius: 8px;
+            padding: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .input-group:focus-within {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .input-group label {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .input-group input {
+            border: none;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            background: transparent;
+            outline: none;
+            width: 100%;
+        }
+
+        /* Coloring Input Borders */
+        .in-a { border-left-color: var(--c-path-a); }
+        .in-b { border-left-color: var(--c-path-b); }
+        .in-r { border-left-color: var(--c-path-r); }
+        .in-bot { border-left-color: var(--c-path-bot); }
+
+        /* --- Solution Panel Section --- */
+        .solution-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .step {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .step-header {
+            font-size: 0.85rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-math {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 1rem;
+            background: #f1f5f9;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            color: #1e293b;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .step-math strong {
+            font-size: 1.1rem;
+        }
+
+        /* Coloring Solution Steps */
+        .step.s1 .step-header { color: var(--c-path-a); }
+        .step.s2 .step-header { color: var(--c-path-b); }
+        .step.s3 .step-header { color: var(--c-step3); }
+        .step.s4 .step-header { color: var(--c-path-r); }
+        .step.s5 .step-header { color: var(--c-step5); }
+        .step.s6 { border: 2px solid var(--c-step6); }
+        .step.s6 .step-header { color: var(--c-step6); font-size: 1rem; }
+        .step.s6 .step-math { background: #fff1f2; color: #9f1239; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Interactive Circuit Solver</h1>
+        <p>Analyze the 8-resistor upper/lower network instantly. Modify values to track the math.</p>
+    </header>
+
+    <main>
+        <!-- DIAGRAM -->
+        <section class="diagram-card">
+            <svg viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <!-- Engineering Grid Pattern -->
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                        <circle cx="2" cy="2" r="1.5" fill="#e2e8f0" />
+                    </pattern>
+                    
+                    <!-- Resistor Symbols -->
+                    <g id="res-h">
+                        <!-- White background block to hide the wire passing underneath -->
+                        <rect x="-32" y="-15" width="64" height="30" fill="#ffffff" />
+                        <!-- Zigzag line -->
+                        <polyline points="-30,0 -20,0 -15,-12 -5,12 5,-12 15,12 20,0 30,0" 
+                                  fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" />
+                    </g>
+                    <g id="res-v">
+                        <rect x="-15" y="-32" width="30" height="64" fill="#ffffff" />
+                        <polyline points="0,-30 0,-20 -12,-15 12,-5 -12,5 12,15 0,20 0,30" 
+                                  fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" />
+                    </g>
+                </defs>
+
+                <!-- Background Layer -->
+                <rect width="800" height="480" fill="#ffffff" />
+                <rect width="800" height="480" fill="url(#grid)" />
+
+                <!-- 
+                   COORDINATE SYSTEM:
+                   IN Node: (100, 300)
+                   OUT Node: (700, 300)
+                   Top-Center Node (TC): (400, 100)
+                -->
+
+                <!-- Wires Layer -->
+                <!-- Path A (Outer Left): IN -> (100,100) -> TC -->
+                <polyline points="100,300 100,100 400,100" fill="none" stroke="var(--c-path-a)" stroke-width="4" />
+                
+                <!-- Path B (Inner Middle): IN -> (250,300) -> (250,200) -> (400,200) -> TC -->
+                <polyline points="100,300 250,300 250,200 400,200 400,100" fill="none" stroke="var(--c-path-b)" stroke-width="4" />
+                
+                <!-- Right Path: TC -> (700,100) -> OUT -->
+                <polyline points="400,100 700,100 700,300" fill="none" stroke="var(--c-path-r)" stroke-width="4" />
+                
+                <!-- Bottom Branch: IN -> (100,420) -> (700,420) -> OUT -->
+                <polyline points="100,300 100,420 700,420 700,300" fill="none" stroke="var(--c-path-bot)" stroke-width="4" />
+
+                <!-- Resistors Layer -->
+                <!-- Path A -->
+                <use href="#res-v" x="100" y="200" style="color: var(--c-path-a);" />
+                <use href="#res-h" x="250" y="100" style="color: var(--c-path-a);" />
+                
+                <!-- Path B -->
+                <use href="#res-h" x="175" y="300" style="color: var(--c-path-b);" />
+                <use href="#res-v" x="250" y="250" style="color: var(--c-path-b);" />
+                <use href="#res-h" x="325" y="200" style="color: var(--c-path-b);" />
+
+                <!-- Right Path -->
+                <use href="#res-h" x="550" y="100" style="color: var(--c-path-r);" />
+                <use href="#res-v" x="700" y="200" style="color: var(--c-path-r);" />
+
+                <!-- Bottom Branch -->
+                <use href="#res-h" x="400" y="420" style="color: var(--c-path-bot);" />
+
+                <!-- Nodes (Draw over wires) -->
+                <circle cx="100" cy="300" r="7" fill="#1e293b" stroke="#ffffff" stroke-width="2"/>
+                <circle cx="400" cy="100" r="7" fill="#1e293b" stroke="#ffffff" stroke-width="2"/>
+                <circle cx="700" cy="300" r="7" fill="#1e293b" stroke="#ffffff" stroke-width="2"/>
+
+                <!-- Text Labels Layer -->
+                <g text-anchor="middle" dominant-baseline="middle" class="svg-lbl">
+                    <!-- Path A Labels -->
+                    <text x="65" y="200" fill="var(--c-path-a)">R1</text>
+                    <text x="250" y="65" fill="var(--c-path-a)">R2</text>
+                    
+                    <!-- Path B Labels -->
+                    <text x="175" y="335" fill="var(--c-path-b)">R3</text>
+                    <text x="285" y="250" fill="var(--c-path-b)">R4</text>
+                    <text x="325" y="165" fill="var(--c-path-b)">R5</text>
+                    
+                    <!-- Right Path Labels -->
+                    <text x="550" y="65" fill="var(--c-path-r)">R6</text>
+                    <text x="735" y="200" fill="var(--c-path-r)">R7</text>
+                    
+                    <!-- Bottom Branch Label -->
+                    <text x="400" y="455" fill="var(--c-path-bot)">R8</text>
+                </g>
+
+                <g class="node-lbl">
+                    <text x="80" y="285" text-anchor="end">INPUT</text>
+                    <text x="720" y="285" text-anchor="start">OUTPUT</text>
+                    <text x="400" y="75" text-anchor="middle">TOP-CENTER NODE</text>
+                </g>
+            </svg>
+        </section>
+
+        <div class="controls-layout">
+            <!-- INPUTS -->
+            <section class="inputs-section">
+                <h2 class="section-title">Configure Resistors</h2>
+                <div class="input-grid">
+                    <div class="input-group in-a">
+                        <label for="inp-r1">R1 (Ω) - Path A</label>
+                        <input type="number" id="inp-r1" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-a">
+                        <label for="inp-r2">R2 (Ω) - Path A</label>
+                        <input type="number" id="inp-r2" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-b">
+                        <label for="inp-r3">R3 (Ω) - Path B</label>
+                        <input type="number" id="inp-r3" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-b">
+                        <label for="inp-r4">R4 (Ω) - Path B</label>
+                        <input type="number" id="inp-r4" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-b">
+                        <label for="inp-r5">R5 (Ω) - Path B</label>
+                        <input type="number" id="inp-r5" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-r">
+                        <label for="inp-r6">R6 (Ω) - Right Path</label>
+                        <input type="number" id="inp-r6" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-r">
+                        <label for="inp-r7">R7 (Ω) - Right Path</label>
+                        <input type="number" id="inp-r7" value="5" min="0" step="0.5">
+                    </div>
+                    <div class="input-group in-bot">
+                        <label for="inp-r8">R8 (Ω) - Bottom</label>
+                        <input type="number" id="inp-r8" value="5" min="0" step="0.5">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SOLUTION PANEL -->
+            <section class="solution-section">
+                <h2 class="section-title">Solution Panel</h2>
+                <div class="solution-steps">
+                    
+                    <div class="step s1">
+                        <div class="step-header">1. Sum of Path A</div>
+                        <div class="step-math" id="out-s1">-</div>
+                    </div>
+
+                    <div class="step s2">
+                        <div class="step-header">2. Sum of Path B</div>
+                        <div class="step-math" id="out-s2">-</div>
+                    </div>
+
+                    <div class="step s3">
+                        <div class="step-header">3. Parallel Equivalent (Path A || Path B)</div>
+                        <div class="step-math" id="out-s3">-</div>
+                    </div>
+
+                    <div class="step s4">
+                        <div class="step-header">4. Sum of Right Path</div>
+                        <div class="step-math" id="out-s4">-</div>
+                    </div>
+
+                    <div class="step s5">
+                        <div class="step-header">5. Upper Network (Series: A||B + Right)</div>
+                        <div class="step-math" id="out-s5">-</div>
+                    </div>
+
+                    <div class="step s6">
+                        <div class="step-header">6. Final Resistance (Upper || Bottom)</div>
+                        <div class="step-math" id="out-s6">-</div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Grab all inputs
+    const inputs = Array.from({length: 8}, (_, i) => document.getElementById(`inp-r${i+1}`));
+    
+    // Grab all output blocks
+    const outS1 = document.getElementById('out-s1');
+    const outS2 = document.getElementById('out-s2');
+    const outS3 = document.getElementById('out-s3');
+    const outS4 = document.getElementById('out-s4');
+    const outS5 = document.getElementById('out-s5');
+    const outS6 = document.getElementById('out-s6');
+
+    // Number formatting helper to avoid long decimals
+    const fmt = (num) => Number(num.toFixed(3)).toString();
+
+    function calculateCircuit() {
+        // Read values, default to 0 if empty/invalid
+        const vals = inputs.map(inp => parseFloat(inp.value) || 0);
+        const [r1, r2, r3, r4, r5, r6, r7, r8] = vals;
+
+        // Step 1: Path A (Series)
+        const pathA = r1 + r2;
+        outS1.innerHTML = `R<sub>A</sub> = R1 + R2<br>= ${r1} + ${r2} = <strong>${fmt(pathA)} Ω</strong>`;
+
+        // Step 2: Path B (Series)
+        const pathB = r3 + r4 + r5;
+        outS2.innerHTML = `R<sub>B</sub> = R3 + R4 + R5<br>= ${r3} + ${r4} + ${r5} = <strong>${fmt(pathB)} Ω</strong>`;
+
+        // Step 3: Path A || Path B (Parallel)
+        let parAB = 0;
+        if (pathA === 0 && pathB === 0) {
+            parAB = 0;
+            outS3.innerHTML = `R<sub>A||B</sub> = <strong>0 Ω</strong> (Short circuit)`;
+        } else if (pathA === 0) {
+            parAB = 0;
+            outS3.innerHTML = `Path A is 0Ω, shorting out Path B.<br>R<sub>A||B</sub> = <strong>0 Ω</strong>`;
+        } else if (pathB === 0) {
+            parAB = 0;
+            outS3.innerHTML = `Path B is 0Ω, shorting out Path A.<br>R<sub>A||B</sub> = <strong>0 Ω</strong>`;
+        } else {
+            parAB = 1 / ((1 / pathA) + (1 / pathB));
+            outS3.innerHTML = `R<sub>A||B</sub> = (R<sub>A</sub> × R<sub>B</sub>) / (R<sub>A</sub> + R<sub>B</sub>)<br>= (${fmt(pathA)} × ${fmt(pathB)}) / (${fmt(pathA)} + ${fmt(pathB)})<br>= <strong>${fmt(parAB)} Ω</strong>`;
+        }
+
+        // Step 4: Right Path (Series)
+        const rightPath = r6 + r7;
+        outS4.innerHTML = `R<sub>Right</sub> = R6 + R7<br>= ${r6} + ${r7} = <strong>${fmt(rightPath)} Ω</strong>`;
+
+        // Step 5: Upper Network (Series: ParAB + RightPath)
+        const upperNet = parAB + rightPath;
+        outS5.innerHTML = `R<sub>Upper</sub> = R<sub>A||B</sub> + R<sub>Right</sub><br>= ${fmt(parAB)} + ${fmt(rightPath)} = <strong>${fmt(upperNet)} Ω</strong>`;
+
+        // Step 6: Final Parallel (UpperNet || BottomBranch)
+        let total = 0;
+        if (upperNet === 0 && r8 === 0) {
+            total = 0;
+            outS6.innerHTML = `R<sub>Total</sub> = <strong>0 Ω</strong> (Short circuit everywhere)`;
+        } else if (upperNet === 0) {
+            total = 0;
+            outS6.innerHTML = `Upper Network is 0Ω, shorting out Bottom Branch.<br>R<sub>Total</sub> = <strong>0 Ω</strong>`;
+        } else if (r8 === 0) {
+            total = 0;
+            outS6.innerHTML = `Bottom Branch is 0Ω, shorting out Upper Network.<br>R<sub>Total</sub> = <strong>0 Ω</strong>`;
+        } else {
+            total = 1 / ((1 / upperNet) + (1 / r8));
+            outS6.innerHTML = `R<sub>Total</sub> = (R<sub>Upper</sub> × R8) / (R<sub>Upper</sub> + R8)<br>= (${fmt(upperNet)} × ${r8}) / (${fmt(upperNet)} + ${r8})<br>= <strong style="font-size:1.25rem;">${fmt(total)} Ω</strong>`;
+        }
+    }
+
+    // Attach listeners and trigger initial calculation
+    inputs.forEach(input => {
+        input.addEventListener('input', calculateCircuit);
+    });
+
+    // Run on load
+    window.addEventListener('DOMContentLoaded', calculateCircuit);
+</script>
+
+</body>
+</html>

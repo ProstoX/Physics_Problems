@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Loop Circuit Visualization - Kirchhoff's Laws</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border-color: #e2e8f0;
+            --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+            --math-bg: #f1f5f9;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            padding: 2rem;
+            line-height: 1.5;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+        }
+
+        /* Canvas Panel */
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            background-color: #ffffff;
+        }
+
+        /* Controls Panel */
+        h2 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .branch-group {
+            background-color: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .branch-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.8rem;
+            color: var(--accent-blue);
+        }
+
+        .input-group {
+            margin-bottom: 0.8rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.3rem;
+        }
+
+        .input-group input[type="number"] {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Toggle Switch */
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+        }
+
+        .toggle-wrapper span {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-blue);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Math Steps */
+        .math-panel {
+            background-color: var(--math-bg);
+            padding: 1.2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-family: 'Cambria', 'Times New Roman', serif;
+            font-size: 1.05rem;
+        }
+
+        .math-step {
+            margin-bottom: 1rem;
+        }
+
+        .math-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .math-step strong {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 0.95rem;
+            color: var(--accent-blue);
+            display: block;
+            margin-bottom: 0.4rem;
+        }
+
+        code {
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+        }
+
+        .results-box {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px dashed #cbd5e1;
+            font-weight: bold;
+        }
+
+        .results-box span.val {
+            color: var(--accent-red);
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .input-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Two-Loop Circuit Analysis</h1>
+        <p>Interactive visualization using Kirchhoff's Voltage and Current Laws</p>
+    </div>
+
+    <div class="container">
+        <!-- Visualization Panel -->
+        <div class="card">
+            <h2>Schematic Diagram</h2>
+            <div class="canvas-container">
+                <canvas id="circuitCanvas" width="600" height="420"></canvas>
+            </div>
+        </div>
+
+        <!-- Controls and Math Panel -->
+        <div class="card">
+            <h2>Circuit Parameters</h2>
+            
+            <div class="input-grid">
+                <!-- Left Branch -->
+                <div class="branch-group">
+                    <div class="branch-title">Left Branch</div>
+                    <div class="input-group">
+                        <label for="e1">Voltage ℰ₁ (V)</label>
+                        <input type="number" id="e1" value="4.5" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label for="rw1">Internal Res r<sub>w1</sub> (Ω)</label>
+                        <input type="number" id="rw1" value="1" step="0.1" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="r1">Main Res R₁ (Ω)</label>
+                        <input type="number" id="r1" value="20" step="0.1" min="0">
+                    </div>
+                </div>
+
+                <!-- Middle Branch -->
+                <div class="branch-group">
+                    <div class="branch-title">Middle Branch</div>
+                    <div class="input-group">
+                        <label for="r2">Resistor R₂ (Ω)</label>
+                        <input type="number" id="r2" value="10" step="0.1" min="0">
+                    </div>
+                </div>
+
+                <!-- Right Branch -->
+                <div class="branch-group">
+                    <div class="branch-title">Right Branch</div>
+                    <div class="input-group">
+                        <label for="e2">Voltage ℰ₂ (V)</label>
+                        <input type="number" id="e2" value="9" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label for="rw2">Internal Res r<sub>w2</sub> (Ω)</label>
+                        <input type="number" id="rw2" value="1" step="0.1" min="0">
+                    </div>
+                    <div class="toggle-wrapper">
+                        <span>ℰ₂ Polarity (Up)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="e2-pol" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <h2>Step-by-Step Calculation</h2>
+            <div class="math-panel">
+                <div class="math-step">
+                    <strong>1. Setup Kirchhoff's Laws</strong>
+                    Node A (Top KCL): <code>I<sub>1</sub> + I<sub>3</sub> = I<sub>2</sub></code><br>
+                    Left Loop (KVL Clockwise): <code>ℰ₁ - I<sub>1</sub>(R₁ + r<sub>w1</sub>) - I<sub>2</sub>R₂ = 0</code><br>
+                    Right Loop (KVL Counter-Clockwise): <code>ℰ₂ - I<sub>3</sub>r<sub>w2</sub> - I<sub>2</sub>R₂ = 0</code>
+                </div>
+                
+                <div class="math-step">
+                    <strong>2. Substitute & Simplify</strong>
+                    Let R<sub>L</sub> = <span id="val-RL"></span> Ω, R<sub>M</sub> = <span id="val-RM"></span> Ω, R<sub>R</sub> = <span id="val-RR"></span> Ω<br>
+                    Eq 1: <code><span id="val-A"></span> I<sub>1</sub> + <span id="val-B"></span> I<sub>3</sub> = <span id="val-E1"></span></code><br>
+                    Eq 2: <code><span id="val-B2"></span> I<sub>1</sub> + <span id="val-C"></span> I<sub>3</sub> = <span id="val-E2"></span></code>
+                </div>
+
+                <div class="math-step results-box">
+                    <strong>3. Final Currents (System Solution)</strong>
+                    I<sub>1</sub> (Left) = <span class="val" id="calc-I1">0.000 A</span><br>
+                    I<sub>2</sub> (Middle) = <span class="val" id="calc-I2">0.000 A</span><br>
+                    I<sub>3</sub> (Right) = <span class="val" id="calc-I3">0.000 A</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('circuitCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Setup high-DPI canvas
+        function setupCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = 600 * dpr;
+            canvas.height = 420 * dpr;
+            ctx.scale(dpr, dpr);
+            ctx.textBaseline = "middle";
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+        }
+
+        // Inputs
+        const els = {
+            e1: document.getElementById('e1'),
+            rw1: document.getElementById('rw1'),
+            r1: document.getElementById('r1'),
+            r2: document.getElementById('r2'),
+            e2: document.getElementById('e2'),
+            rw2: document.getElementById('rw2'),
+            e2pol: document.getElementById('e2-pol'),
+        };
+
+        // UI update fields
+        const ui = {
+            RL: document.getElementById('val-RL'),
+            RM: document.getElementById('val-RM'),
+            RR: document.getElementById('val-RR'),
+            A: document.getElementById('val-A'),
+            B: document.getElementById('val-B'),
+            B2: document.getElementById('val-B2'),
+            C: document.getElementById('val-C'),
+            E1: document.getElementById('val-E1'),
+            E2: document.getElementById('val-E2'),
+            I1: document.getElementById('calc-I1'),
+            I2: document.getElementById('calc-I2'),
+            I3: document.getElementById('calc-I3'),
+        };
+
+        function drawResistor(x, y, isVertical) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#0f172a";
+            ctx.lineWidth = 2;
+
+            if (isVertical) {
+                ctx.clearRect(x - 20, y - 25, 40, 50);
+                ctx.moveTo(x, y - 20);
+                ctx.lineTo(x - 12, y - 13);
+                ctx.lineTo(x + 12, y - 6);
+                ctx.lineTo(x - 12, y + 1);
+                ctx.lineTo(x + 12, y + 8);
+                ctx.lineTo(x, y + 15);
+                ctx.lineTo(x, y + 20);
+            } else {
+                ctx.clearRect(x - 25, y - 20, 50, 40);
+                ctx.moveTo(x - 20, y);
+                ctx.lineTo(x - 13, y - 12);
+                ctx.lineTo(x - 6, y + 12);
+                ctx.lineTo(x + 1, y - 12);
+                ctx.lineTo(x + 8, y + 12);
+                ctx.lineTo(x + 15, y);
+                ctx.lineTo(x + 20, y);
+            }
+            ctx.stroke();
+        }
+
+        function drawBattery(x, y, isVertical, polarityUp) {
+            ctx.beginPath();
+            if (isVertical) {
+                ctx.clearRect(x - 20, y - 15, 40, 30);
+                
+                let topY = polarityUp ? y - 6 : y + 6;
+                let botY = polarityUp ? y + 6 : y - 6;
+                
+                // Long line (Positive)
+                ctx.strokeStyle = "#0f172a";
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(x - 18, topY);
+                ctx.lineTo(x + 18, topY);
+                ctx.stroke();
+                
+                // Short thick line (Negative)
+                ctx.beginPath();
+                ctx.lineWidth = 4;
+                ctx.moveTo(x - 10, botY);
+                ctx.lineTo(x + 10, botY);
+                ctx.stroke();
+
+                // Plus / Minus Labels
+                ctx.font = "bold 16px monospace";
+                ctx.fillStyle = "#ef4444"; // Red for Positive
+                ctx.fillText("+", x - 30, topY);
+                ctx.fillStyle = "#3b82f6"; // Blue for Negative
+                ctx.fillText("-", x - 30, botY);
+            }
+            ctx.lineWidth = 2; // Reset
+        }
+
+        function drawArrow(x, y, angleRad, label, value, isNegative) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Standard direction arrow
+            let effAngle = isNegative ? angleRad + Math.PI : angleRad;
+            ctx.rotate(effAngle);
+
+            // Draw Triangle
+            ctx.fillStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-14, -7);
+            ctx.lineTo(-14, 7);
+            ctx.fill();
+            ctx.restore();
+
+            // Label
+            ctx.fillStyle = "#ef4444";
+            ctx.font = "bold 14px Arial";
+            
+            // Positioning text slightly offset from arrow
+            let txtX = x;
+            let txtY = y;
+            if (angleRad === 0) { txtX += 10; txtY -= 15; }       // Right
+            if (angleRad === Math.PI/2) { txtX += 15; txtY += 10; } // Down
+            if (angleRad === Math.PI) { txtX -= 10; txtY -= 15; }   // Left
+
+            ctx.textAlign = angleRad === Math.PI ? "right" : "left";
+            ctx.fillText(`${label} = ${Math.abs(value).toFixed(3)} A`, txtX, txtY);
+        }
+
+        function drawLabel(text, x, y, align="left") {
+            ctx.fillStyle = "#0f172a";
+            ctx.font = "14px 'Segoe UI', Arial, sans-serif";
+            ctx.textAlign = align;
+            ctx.fillText(text, x, y);
+        }
+
+        function drawCircuit(I1, I2, I3, params) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Coordinates
+            const xLeft = 120, xMid = 300, xRight = 480;
+            const yTop = 80, yBot = 340;
+
+            // Draw Main Wires
+            ctx.strokeStyle = "#0f172a";
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            // Top wire
+            ctx.moveTo(xLeft, yTop); ctx.lineTo(xRight, yTop);
+            // Bottom wire
+            ctx.moveTo(xLeft, yBot); ctx.lineTo(xRight, yBot);
+            // Left wire
+            ctx.moveTo(xLeft, yTop); ctx.lineTo(xLeft, yBot);
+            // Middle wire
+            ctx.moveTo(xMid, yTop); ctx.lineTo(xMid, yBot);
+            // Right wire
+            ctx.moveTo(xRight, yTop); ctx.lineTo(xRight, yBot);
+            ctx.stroke();
+
+            // Draw Nodes A and B
+            ctx.fillStyle = "#0f172a";
+            ctx.beginPath(); ctx.arc(xMid, yTop, 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(xMid, yBot, 5, 0, Math.PI*2); ctx.fill();
+            drawLabel("Node A", xMid, yTop - 20, "center");
+            drawLabel("Node B", xMid, yBot + 20, "center");
+
+            // LEFT BRANCH
+            drawResistor(xLeft, 140, true);
+            drawLabel(`R₁ = ${params.r1}Ω`, xLeft - 40, 140, "right");
+            
+            drawResistor(xLeft, 210, true);
+            drawLabel(`rw₁ = ${params.rw1}Ω`, xLeft - 40, 210, "right");
+
+            drawBattery(xLeft, 280, true, true); // E1 always UP
+            drawLabel(`ℰ₁ = ${params.e1}V`, xLeft - 45, 280, "right");
+
+            // MIDDLE BRANCH
+            drawResistor(xMid, 210, true);
+            drawLabel(`R₂ = ${params.r2}Ω`, xMid + 30, 210, "left");
+
+            // RIGHT BRANCH
+            drawResistor(xRight, 180, true);
+            drawLabel(`rw₂ = ${params.rw2}Ω`, xRight + 30, 180, "left");
+
+            drawBattery(xRight, 260, true, params.e2pol);
+            drawLabel(`ℰ₂ = ${params.e2}V`, xRight + 45, 260, "left");
+
+            // DRAW CURRENTS (Arrows)
+            // I1 flowing RIGHT into Node A
+            drawArrow((xLeft + xMid)/2, yTop, 0, "I₁", I1, I1 < 0);
+            
+            // I3 flowing LEFT into Node A
+            drawArrow((xRight + xMid)/2, yTop, Math.PI, "I₃", I3, I3 < 0);
+            
+            // I2 flowing DOWN from Node A
+            drawArrow(xMid, yTop + 45, Math.PI/2, "I₂", I2, I2 < 0);
+        }
+
+        function calculateAndUpdate() {
+            // Get Values
+            const E1 = parseFloat(els.e1.value) || 0;
+            const r1 = parseFloat(els.r1.value) || 0;
+            const rw1 = parseFloat(els.rw1.value) || 0;
+            
+            const r2 = parseFloat(els.r2.value) || 0;
+            
+            let E2 = parseFloat(els.e2.value) || 0;
+            const rw2 = parseFloat(els.rw2.value) || 0;
+            const e2PolUp = els.e2pol.checked;
+            
+            // Apply polarity
+            if (!e2PolUp) E2 = -E2;
+
+            // Math Setup
+            const RL = r1 + rw1;
+            const RM = r2;
+            const RR = rw2;
+
+            const A = RL + RM;
+            const B = RM;
+            const C = RR + RM;
+
+            // Cramer's Rule for:
+            // A*I1 + B*I3 = E1
+            // B*I1 + C*I3 = E2
+            const Det = (A * C) - (B * B);
+            
+            let I1 = 0, I3 = 0, I2 = 0;
+
+            if (Det !== 0) {
+                I1 = (E1 * C - E2 * B) / Det;
+                I3 = (E2 * A - E1 * B) / Det;
+                I2 = I1 + I3;
+            }
+
+            // Update Math Text UI
+            ui.RL.innerText = RL.toFixed(1);
+            ui.RM.innerText = RM.toFixed(1);
+            ui.RR.innerText = RR.toFixed(1);
+
+            ui.A.innerText = A.toFixed(1);
+            ui.B.innerText = B.toFixed(1);
+            ui.B2.innerText = B.toFixed(1);
+            ui.C.innerText = C.toFixed(1);
+            
+            ui.E1.innerText = E1.toFixed(1);
+            ui.E2.innerText = E2.toFixed(1);
+
+            ui.I1.innerHTML = `${I1.toFixed(3)} A`;
+            ui.I2.innerHTML = `${I2.toFixed(3)} A`;
+            ui.I3.innerHTML = `${I3.toFixed(3)} A`;
+
+            // Draw Circuit Diagram
+            drawCircuit(I1, I2, I3, {
+                e1: els.e1.value,
+                r1: els.r1.value,
+                rw1: els.rw1.value,
+                r2: els.r2.value,
+                e2: els.e2.value,
+                rw2: els.rw2.value,
+                e2pol: e2PolUp
+            });
+        }
+
+        // Attach Event Listeners
+        Object.values(els).forEach(el => {
+            el.addEventListener('input', calculateAndUpdate);
+            el.addEventListener('change', calculateAndUpdate);
+        });
+
+        // Initialize
+        setupCanvas();
+        calculateAndUpdate();
+        
+        // Handle resize if needed (simplified)
+        window.addEventListener('resize', () => {
+            setupCanvas();
+            calculateAndUpdate();
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mixed Circuit Calculator</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --primary-color: #2563eb;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --accent-bg: #eff6ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Canvas Wrapper to handle responsive scaling */
+        .canvas-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+            background-color: #fafafa;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls-section h2, .results-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent-bg);
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text-main);
+        }
+
+        .input-group input {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--accent-bg);
+        }
+
+        .results-section {
+            margin-top: 2rem;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.95rem;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-item.total {
+            background-color: var(--accent-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            border: 1px solid #bfdbfe;
+        }
+
+        .result-value {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: 600;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Mixed Circuit Equivalent Resistance</h1>
+            <p class="subtitle">Interactive schematic and step-by-step calculator</p>
+        </header>
+
+        <div class="grid-layout">
+            <!-- Left Side: Schematic Drawing -->
+            <div class="card">
+                <div class="canvas-wrapper">
+                    <canvas id="circuitCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Right Side: Controls & Results -->
+            <div class="card">
+                <div class="controls-section">
+                    <h2>Resistor Values (Ω)</h2>
+                    <div class="input-grid">
+                        <div class="input-group">
+                            <label for="r1">R₁ (Top Series)</label>
+                            <input type="number" id="r1" value="10" min="0" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label for="r2">R₂ (Top Series)</label>
+                            <input type="number" id="r2" value="10" min="0" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label for="r3">R₃ (Bottom Series)</label>
+                            <input type="number" id="r3" value="10" min="0" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label for="r4">R₄ (Inner Parallel)</label>
+                            <input type="number" id="r4" value="10" min="0" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label for="r5">R₅ (Inner Parallel)</label>
+                            <input type="number" id="r5" value="10" min="0" step="0.1">
+                        </div>
+                        <div class="input-group">
+                            <label for="r6">R₆ (Final Series)</label>
+                            <input type="number" id="r6" value="10" min="0" step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-section">
+                    <h2>Calculations</h2>
+                    <div class="result-item">
+                        <span>1. Top Branch <br><small class="subtitle">(R₁ + R₂)</small></span>
+                        <span class="result-value" id="out-top">0.00 Ω</span>
+                    </div>
+                    <div class="result-item">
+                        <span>2. Bottom Inner <br><small class="subtitle">(R₄ || R₅)</small></span>
+                        <span class="result-value" id="out-inner">0.00 Ω</span>
+                    </div>
+                    <div class="result-item">
+                        <span>3. Bottom Total <br><small class="subtitle">(R₃ + R_inner)</small></span>
+                        <span class="result-value" id="out-bot">0.00 Ω</span>
+                    </div>
+                    <div class="result-item">
+                        <span>4. Main Parallel <br><small class="subtitle">(Top || Bottom Total)</small></span>
+                        <span class="result-value" id="out-main">0.00 Ω</span>
+                    </div>
+                    <div class="result-item total">
+                        <span>5. Total R_eq <br><small style="font-size: 0.85rem; font-weight: normal; color: #1e3a8a;">(Main Parallel + R₆)</small></span>
+                        <span class="result-value" id="out-total">0.00 Ω</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Setup Canvas with DPI scaling for crisp rendering
+        const canvas = document.getElementById('circuitCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Logical size of the canvas
+        const canvasWidth = 700;
+        const canvasHeight = 350;
+        
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = canvasWidth * dpr;
+        canvas.height = canvasHeight * dpr;
+        canvas.style.width = `${canvasWidth}px`;
+        canvas.style.height = `${canvasHeight}px`;
+        ctx.scale(dpr, dpr);
+
+        // Get Input Elements
+        const inputs = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'].map(id => document.getElementById(id));
+        
+        // Parallel Resistance Helper
+        function calcParallel(rA, rB) {
+            if (rA === 0 || rB === 0) return 0;
+            return (rA * rB) / (rA + rB);
+        }
+
+        // Draw Helper Functions
+        function drawLine(x1, y1, x2, y2) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+
+        function drawNode(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#1f2937';
+            ctx.fill();
+        }
+
+        function drawTerminal(x, y, label) {
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = "#1f2937";
+            ctx.font = "bold 12px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(label, x, y - 15);
+        }
+
+        function drawResistor(x, y, label, val) {
+            // A resistor is 60px wide from x to x+60
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + 10, y);
+            ctx.lineTo(x + 15, y - 12);
+            ctx.lineTo(x + 25, y + 12);
+            ctx.lineTo(x + 35, y - 12);
+            ctx.lineTo(x + 45, y + 12);
+            ctx.lineTo(x + 50, y);
+            ctx.lineTo(x + 60, y);
+            ctx.stroke();
+
+            // Labels
+            ctx.textAlign = "center";
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillStyle = "#1f2937";
+            ctx.fillText(label, x + 30, y - 20);
+            
+            ctx.font = "12px monospace";
+            ctx.fillStyle = "#2563eb";
+            ctx.fillText(val + " Ω", x + 30, y + 26);
+            ctx.strokeStyle = "#1f2937"; // reset stroke color
+        }
+
+        function drawCircuit(rVals) {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#1f2937";
+            ctx.lineJoin = "round";
+
+            // IN Terminal & Initial wire
+            drawTerminal(40, 175, "IN");
+            drawLine(46, 175, 90, 175);
+            drawNode(90, 175);
+
+            // Split into Top and Bottom branches
+            drawLine(90, 175, 90, 80);  // Up to Top
+            drawLine(90, 175, 90, 270); // Down to Bottom
+
+            // ================== TOP BRANCH ==================
+            drawLine(90, 80, 160, 80);
+            drawResistor(160, 80, "R₁", rVals[0]); // R1
+            drawLine(220, 80, 320, 80);
+            drawResistor(320, 80, "R₂", rVals[1]); // R2
+            drawLine(380, 80, 500, 80);
+
+            // ================== BOTTOM BRANCH ==================
+            drawLine(90, 270, 130, 270);
+            drawResistor(130, 270, "R₃", rVals[2]); // R3
+            drawLine(190, 270, 230, 270);
+            drawNode(230, 270);
+
+            // Bottom Branch - Inner Parallel Split
+            drawLine(230, 270, 230, 220); // Up to inner top (R4)
+            drawLine(230, 270, 230, 320); // Down to inner bottom (R5)
+
+            // Inner Parallel - Top (R4)
+            drawLine(230, 220, 270, 220);
+            drawResistor(270, 220, "R₄", rVals[3]);
+            drawLine(330, 220, 370, 220);
+            drawLine(370, 220, 370, 270); // Back down to inner merge
+
+            // Inner Parallel - Bottom (R5)
+            drawLine(230, 320, 270, 320);
+            drawResistor(270, 320, "R₅", rVals[4]);
+            drawLine(330, 320, 370, 320);
+            drawLine(370, 320, 370, 270); // Back up to inner merge
+
+            drawNode(370, 270);
+            drawLine(370, 270, 500, 270);
+
+            // ================== MAIN MERGE ==================
+            drawLine(500, 80, 500, 175);  // Top branch down
+            drawLine(500, 270, 500, 175); // Bottom branch up
+            drawNode(500, 175);
+
+            // ================== FINAL SERIES & OUT ==================
+            drawLine(500, 175, 530, 175);
+            drawResistor(530, 175, "R₆", rVals[5]); // R6
+            drawLine(590, 175, 660, 175);
+            drawTerminal(660, 175, "OUT");
+        }
+
+        function calculateAndUpdate() {
+            // Fetch current values
+            const vals = inputs.map(input => parseFloat(input.value) || 0);
+            const [r1, r2, r3, r4, r5, r6] = vals;
+
+            // 1. Top branch equivalent
+            const topReq = r1 + r2;
+            
+            // 2. Bottom branch inner parallel
+            const botInnerReq = calcParallel(r4, r5);
+            
+            // 3. Bottom branch total
+            const botReq = r3 + botInnerReq;
+            
+            // 4. Main parallel equivalent
+            const mainParaReq = calcParallel(topReq, botReq);
+            
+            // 5. Total Circuit equivalent
+            const totalReq = mainParaReq + r6;
+
+            // Update DOM text
+            document.getElementById('out-top').innerText = topReq.toFixed(2) + " Ω";
+            document.getElementById('out-inner').innerText = botInnerReq.toFixed(2) + " Ω";
+            document.getElementById('out-bot').innerText = botReq.toFixed(2) + " Ω";
+            document.getElementById('out-main').innerText = mainParaReq.toFixed(2) + " Ω";
+            document.getElementById('out-total').innerText = totalReq.toFixed(2) + " Ω";
+
+            // Redraw Circuit with new labels
+            drawCircuit(vals);
+        }
+
+        // Attach event listeners
+        inputs.forEach(input => {
+            input.addEventListener('input', calculateAndUpdate);
+        });
+
+        // Initial render
+        window.addEventListener('load', calculateAndUpdate);
+
+    </script>
+</body>
+</html>

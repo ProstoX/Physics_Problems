@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Average Current Lightning Example</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg2: #111827;
+      --card: rgba(255,255,255,0.08);
+      --card-strong: rgba(255,255,255,0.12);
+      --text: #e5eefc;
+      --muted: #b7c3d9;
+      --accent: #7dd3fc;
+      --accent2: #fbbf24;
+      --good: #34d399;
+      --line: rgba(255,255,255,0.12);
+      --shadow: 0 20px 60px rgba(0,0,0,0.35);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(125, 211, 252, 0.18), transparent 30%),
+        radial-gradient(circle at right, rgba(251, 191, 36, 0.14), transparent 25%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+      align-items: stretch;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .top-card {
+      padding: 26px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.86rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .title {
+      margin: 0 0 16px;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 62ch;
+    }
+
+    .formula {
+      margin-top: 20px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: clamp(1.2rem, 2.2vw, 1.9rem);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .formula .label { color: var(--accent2); }
+    .formula .math { color: var(--text); }
+
+    .hero-side {
+      display: grid;
+      gap: 20px;
+    }
+
+    .bolt-card {
+      padding: 20px;
+      display: grid;
+      place-items: center;
+      min-height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bolt-card::before {
+      content: "";
+      position: absolute;
+      inset: -20% -10%;
+      background: radial-gradient(circle at 50% 35%, rgba(251,191,36,0.2), transparent 45%);
+      pointer-events: none;
+    }
+
+    .bolt {
+      width: min(260px, 70vw);
+      height: auto;
+      filter: drop-shadow(0 0 22px rgba(251,191,36,0.45));
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.95; }
+      50% { transform: translateY(-4px) scale(1.02); opacity: 1; }
+    }
+
+    .bolt-caption {
+      margin-top: 12px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    .step-card {
+      grid-column: span 7;
+      padding: 22px;
+    }
+
+    .result-card {
+      grid-column: span 5;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .steps {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+    }
+
+    .num {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      background: rgba(125, 211, 252, 0.18);
+      color: var(--accent);
+      flex: none;
+    }
+
+    .step strong { color: var(--text); }
+    .step p { margin: 0.15rem 0 0; color: var(--muted); line-height: 1.55; }
+
+    .result-box {
+      border-radius: 22px;
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(52,211,153,0.16), rgba(52,211,153,0.08));
+      border: 1px solid rgba(52,211,153,0.28);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .result-label {
+      color: #a7f3d0;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .result-value {
+      font-size: clamp(2.2rem, 5vw, 4rem);
+      line-height: 1;
+      font-weight: 800;
+      margin: 0;
+      color: #dcfce7;
+    }
+
+    .result-meta {
+      margin-top: 10px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .note {
+      margin-top: 20px;
+      padding: 18px 20px;
+      border-left: 4px solid var(--accent);
+      border-radius: 16px;
+      background: rgba(125, 211, 252, 0.08);
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .inline-math {
+      color: var(--text);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .units {
+      color: var(--accent2);
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .hero, .grid { grid-template-columns: 1fr; }
+      .step-card, .result-card { grid-column: auto; }
+    }
+
+    @media (max-width: 640px) {
+      .wrap { padding: 14px; }
+      .top-card, .step-card, .result-card, .bolt-card { padding: 18px; }
+      .step { grid-template-columns: 28px 1fr; }
+      .num { width: 28px; height: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="card top-card">
+        <div class="eyebrow">Electric current • lightning example</div>
+        <h1 class="title">Average Current from a Lightning Strike</h1>
+        <p class="subtitle">
+          A lightning bolt transfers a large amount of charge in a very short time.
+          Here, we calculate the average current using charge and time interval.
+        </p>
+        <div class="formula">
+          <span class="label">Formula:</span>
+          <span class="math">I<sub>avg</sub> = ΔQ / Δt</span>
+        </div>
+      </div>
+
+      <div class="card bolt-card" aria-label="Lightning bolt illustration">
+        <svg class="bolt" viewBox="0 0 220 260" role="img" aria-labelledby="boltTitle boltDesc">
+          <title id="boltTitle">Lightning bolt icon</title>
+          <desc id="boltDesc">A stylized yellow lightning bolt with glow.</desc>
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fde68a" />
+              <stop offset="100%" stop-color="#f59e0b" />
+            </linearGradient>
+          </defs>
+          <path d="M120 8 L44 140 H97 L70 252 L178 101 H118 Z" fill="url(#g)" stroke="#fff2bf" stroke-width="3" />
+          <path d="M120 8 L44 140 H97 L70 252 L178 101 H118 Z" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8" stroke-linejoin="round" opacity="0.25" />
+        </svg>
+        <div class="bolt-caption">
+          A lightning bolt can carry a huge charge in just milliseconds, producing a very large current.
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card step-card">
+        <h2 class="section-title">Step-by-step calculation</h2>
+        <div class="steps" id="steps"></div>
+      </div>
+
+      <div class="card result-card">
+        <div class="result-box">
+          <div class="result-label">Final answer</div>
+          <p class="result-value" id="result">15000 A</p>
+          <div class="result-meta" id="resultMeta"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card note">
+      <strong>Explanation:</strong> Average current is charge transferred per unit time.
+      Since 2 ms = 0.002 s, a charge of 30 C in 0.002 s gives a very large current of 15000 A.
+      That is why lightning is such an intense electrical event.
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const charge = 30; // C
+      const tMs = 2;
+      const tS = tMs / 1000;
+      const current = charge / tS;
+
+      const steps = [
+        {
+          n: 1,
+          text: `Given charge transferred: <span class="inline-math">ΔQ = ${charge} <span class="units">C</span></span>.`
+        },
+        {
+          n: 2,
+          text: `Given time interval: <span class="inline-math">Δt = ${tMs} <span class="units">ms</span></span>.`
+        },
+        {
+          n: 3,
+          text: `Convert milliseconds to seconds: <span class="inline-math">${tMs} <span class="units">ms</span> = ${tS.toFixed(3)} <span class="units">s</span></span>.`
+        },
+        {
+          n: 4,
+          text: `Apply the formula: <span class="inline-math">I<sub>avg</sub> = ΔQ / Δt = ${charge} / ${tS.toFixed(3)}</span>.`
+        },
+        {
+          n: 5,
+          text: `Compute the result: <span class="inline-math">I<sub>avg</sub> = ${current.toLocaleString()} <span class="units">A</span></span>.`
+        }
+      ];
+
+      const stepsEl = document.getElementById('steps');
+      stepsEl.innerHTML = steps.map(step => `
+        <div class="step">
+          <div class="num">${step.n}</div>
+          <div>${step.text}</div>
+        </div>
+      `).join('');
+
+      const resultMeta = document.getElementById('resultMeta');
+      resultMeta.innerHTML = `
+        <div><strong>Charge:</strong> <span class="inline-math">${charge} <span class="units">C</span></span></div>
+        <div><strong>Time:</strong> <span class="inline-math">${tMs} <span class="units">ms</span></span> = <span class="inline-math">${tS.toFixed(3)} <span class="units">s</span></span></div>
+        <div><strong>Current:</strong> <span class="inline-math">${current.toLocaleString()} <span class="units">A</span></span></div>
+      `;
+
+      // Gentle emphasis animation on the result box.
+      const result = document.getElementById('result');
+      let flash = 0;
+      setInterval(() => {
+        flash = (flash + 1) % 2;
+        result.style.textShadow = flash
+          ? '0 0 20px rgba(52, 211, 153, 0.55)'
+          : 'none';
+      }, 900);
+    })();
+  </script>
+</body>
+</html>

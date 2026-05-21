@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3-Branch Circuit</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --circuit-stroke: #1e293b;
+            --highlight: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--text-main);
+        }
+
+        .header p {
+            margin: 0.5rem 0 0;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .circuit-display {
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            background-color: #fafafa;
+            border-bottom: 1px solid var(--border);
+        }
+
+        svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .circuit-path {
+            fill: none;
+            stroke: var(--circuit-stroke);
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .circuit-text {
+            font-family: monospace;
+            font-size: 14px;
+            fill: var(--text-main);
+            font-weight: 600;
+        }
+
+        .controls-section {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 600px) {
+            .controls-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 500;
+        }
+
+        .value-display {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 4px;
+            outline: none;
+            margin: 10px 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            transition: background 0.15s ease-in-out;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--primary-hover);
+        }
+
+        .result-panel {
+            background: var(--text-main);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-panel h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 500;
+        }
+
+        .result-value {
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: monospace;
+            color: #4ade80;
+        }
+
+        .fixed-notes {
+            grid-column: 1 / -1;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Nodal Analysis Circuit Calculator</h1>
+        <p>Adjust parameters to calculate the current flowing through the middle branch (Ammeter).</p>
+    </div>
+
+    <div class="circuit-display">
+        <svg viewBox="0 0 700 400" width="700" height="400">
+            <!-- Left and Right Vertical Wires -->
+            <line x1="100" y1="100" x2="100" y2="300" class="circuit-path" />
+            <line x1="600" y1="100" x2="600" y2="300" class="circuit-path" />
+            
+            <!-- Nodes -->
+            <circle cx="100" cy="100" r="4" fill="var(--circuit-stroke)" />
+            <circle cx="100" cy="200" r="4" fill="var(--circuit-stroke)" />
+            <circle cx="100" cy="300" r="4" fill="var(--circuit-stroke)" />
+            <circle cx="600" cy="100" r="4" fill="var(--circuit-stroke)" />
+            <circle cx="600" cy="200" r="4" fill="var(--circuit-stroke)" />
+            <circle cx="600" cy="300" r="4" fill="var(--circuit-stroke)" />
+
+            <!-- Node Labels -->
+            <text x="70" y="205" class="circuit-text" fill="var(--highlight)">V&#8333;</text>
+            <text x="615" y="205" class="circuit-text">0V (Ref)</text>
+
+            <!-- TOP BRANCH (y=100) -->
+            <!-- Wire & Battery e2 -->
+            <path d="M 100 100 L 220 100" class="circuit-path" />
+            <!-- Battery symbol (long bar left = positive facing left) -->
+            <line x1="220" y1="80" x2="220" y2="120" stroke="var(--circuit-stroke)" stroke-width="3" />
+            <line x1="235" y1="90" x2="235" y2="110" stroke="var(--circuit-stroke)" stroke-width="6" />
+            <text x="215" y="70" class="circuit-text" id="lbl-e2">&epsilon;&#8322; = 10V</text>
+            <!-- Wire to rw2 -->
+            <path d="M 235 100 L 420 100" class="circuit-path" />
+            <!-- Resistor rw2 -->
+            <path d="M 420 100 L 430 85 L 450 115 L 470 85 L 490 115 L 500 100 L 520 100" class="circuit-path" />
+            <text x="440" y="70" class="circuit-text">r_w2 = 1&Omega;</text>
+            <!-- Wire to end -->
+            <path d="M 520 100 L 600 100" class="circuit-path" />
+
+
+            <!-- MIDDLE BRANCH (y=200) -->
+            <!-- Wire & Ammeter -->
+            <path d="M 100 200 L 250 200" class="circuit-path" />
+            <circle cx="270" cy="200" r="20" class="circuit-path" fill="#fff" />
+            <text x="264" y="205" class="circuit-text" style="font-size: 16px;">A</text>
+            <!-- Wire to R2 -->
+            <path d="M 290 200 L 420 200" class="circuit-path" />
+            <!-- Resistor R2 -->
+            <path d="M 420 200 L 430 185 L 450 215 L 470 185 L 490 215 L 500 200 L 520 200" class="circuit-path" />
+            <text x="440" y="170" class="circuit-text" id="lbl-R2">R&#8322; = 10&Omega;</text>
+            <!-- Wire to end -->
+            <path d="M 520 200 L 600 200" class="circuit-path" />
+
+
+            <!-- BOTTOM BRANCH (y=300) -->
+            <!-- Wire & Battery e1 -->
+            <path d="M 100 300 L 180 300" class="circuit-path" />
+            <!-- Battery symbol (long bar left) -->
+            <line x1="180" y1="280" x2="180" y2="320" stroke="var(--circuit-stroke)" stroke-width="3" />
+            <line x1="195" y1="290" x2="195" y2="310" stroke="var(--circuit-stroke)" stroke-width="6" />
+            <text x="175" y="270" class="circuit-text" id="lbl-e1">&epsilon;&#8321; = 10V</text>
+            <!-- Wire to rw1 -->
+            <path d="M 195 300 L 260 300" class="circuit-path" />
+            <!-- Resistor rw1 -->
+            <path d="M 260 300 L 270 285 L 290 315 L 310 285 L 330 315 L 340 300 L 360 300" class="circuit-path" />
+            <text x="270" y="270" class="circuit-text">r_w1 = 1&Omega;</text>
+            <!-- Wire to R1 -->
+            <path d="M 360 300 L 420 300" class="circuit-path" />
+            <!-- Resistor R1 -->
+            <path d="M 420 300 L 430 285 L 450 315 L 470 285 L 490 315 L 500 300 L 520 300" class="circuit-path" />
+            <text x="440" y="270" class="circuit-text" id="lbl-R1">R&#8321; = 10&Omega;</text>
+            <!-- Wire to end -->
+            <path d="M 520 300 L 600 300" class="circuit-path" />
+        </svg>
+    </div>
+
+    <div class="controls-section">
+        <div class="control-group">
+            <div class="control-header">
+                <label for="e1">Battery &epsilon;&#8321; Voltage</label>
+                <span class="value-display" id="val-e1">10 V</span>
+            </div>
+            <input type="range" id="e1" min="0" max="20" step="0.5" value="10">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="e2">Battery &epsilon;&#8322; Voltage</label>
+                <span class="value-display" id="val-e2">10 V</span>
+            </div>
+            <input type="range" id="e2" min="0" max="20" step="0.5" value="10">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="R1">Resistor R&#8321;</label>
+                <span class="value-display" id="val-R1">10 &Omega;</span>
+            </div>
+            <input type="range" id="R1" min="1" max="50" step="1" value="10">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">
+                <label for="R2">Resistor R&#8322;</label>
+                <span class="value-display" id="val-R2">10 &Omega;</span>
+            </div>
+            <input type="range" id="R2" min="1" max="50" step="1" value="10">
+        </div>
+
+        <div class="fixed-notes">
+            Internal wire resistances r<sub>w1</sub> and r<sub>w2</sub> are fixed at 1 &Omega;. Batteries inject current towards the left node (V<sub>x</sub>). Ammeter reading denotes current flowing from Left to Right.
+        </div>
+    </div>
+
+    <div class="result-panel">
+        <div>
+            <h2>Ammeter Reading (I<sub>mid</sub>)</h2>
+            <div style="font-size: 0.85rem; opacity: 0.8; margin-top: 5px;">Calculated using Nodal Analysis</div>
+        </div>
+        <div class="result-value" id="result-ammeter">0.000 A</div>
+    </div>
+</div>
+
+<script>
+    // Constants
+    const rw1 = 1.0;
+    const rw2 = 1.0;
+
+    // Elements
+    const e1Input = document.getElementById('e1');
+    const e2Input = document.getElementById('e2');
+    const R1Input = document.getElementById('R1');
+    const R2Input = document.getElementById('R2');
+
+    const valE1 = document.getElementById('val-e1');
+    const valE2 = document.getElementById('val-e2');
+    const valR1 = document.getElementById('val-R1');
+    const valR2 = document.getElementById('val-R2');
+
+    const lblE1 = document.getElementById('lbl-e1');
+    const lblE2 = document.getElementById('lbl-e2');
+    const lblR1 = document.getElementById('lbl-R1');
+    const lblR2 = document.getElementById('lbl-R2');
+
+    const resultAmmeter = document.getElementById('result-ammeter');
+
+    function updateCircuit() {
+        // 1. Get current values
+        const e1 = parseFloat(e1Input.value);
+        const e2 = parseFloat(e2Input.value);
+        const R1 = parseFloat(R1Input.value);
+        const R2 = parseFloat(R2Input.value);
+
+        // 2. Update UI text and SVG labels
+        valE1.innerHTML = e1 + ' V';
+        valE2.innerHTML = e2 + ' V';
+        valR1.innerHTML = R1 + ' &Omega;';
+        valR2.innerHTML = R2 + ' &Omega;';
+
+        lblE1.innerHTML = `&epsilon;&#8321; = ${e1}V`;
+        lblE2.innerHTML = `&epsilon;&#8322; = ${e2}V`;
+        lblR1.innerHTML = `R&#8321; = ${R1}&Omega;`;
+        lblR2.innerHTML = `R&#8322; = ${R2}&Omega;`;
+
+        // 3. Nodal Analysis Calculation
+        // Let Right vertical wire be Reference Node (0V).
+        // Let Left vertical wire be Node X with voltage Vx.
+        // Assuming batteries have positive terminal on the left (pushing current into Vx)
+        
+        // Conductances of each branch
+        const G_top = 1 / rw2;
+        const G_mid = 1 / R2; 
+        const G_bot = 1 / (rw1 + R1);
+
+        // Sum of conductances
+        const G_eq = G_top + G_mid + G_bot;
+
+        // Equivalent current source pushing into Node X from batteries
+        const I_in_top = e2 / rw2;
+        const I_in_bot = e1 / (rw1 + R1);
+        const I_eq = I_in_top + I_in_bot;
+
+        // Node Voltage at Left Wire (Vx)
+        const Vx = I_eq / G_eq;
+
+        // Current through the middle branch (Ammeter)
+        // Flows from Node X (Left) to Reference Node (Right)
+        const I_mid = Vx / R2;
+
+        // 4. Update Result Display
+        const sign = I_mid >= 0 ? '' : '-';
+        resultAmmeter.innerHTML = sign + Math.abs(I_mid).toFixed(3) + ' A';
+        
+        // Optional: Change color if negative
+        if(I_mid < 0) {
+            resultAmmeter.style.color = '#f87171'; // Light red
+        } else {
+            resultAmmeter.style.color = '#4ade80'; // Light green
+        }
+    }
+
+    // Event Listeners
+    e1Input.addEventListener('input', updateCircuit);
+    e2Input.addEventListener('input', updateCircuit);
+    R1Input.addEventListener('input', updateCircuit);
+    R2Input.addEventListener('input', updateCircuit);
+
+    // Initial calculation
+    updateCircuit();
+</script>
+
+</body>
+</html>

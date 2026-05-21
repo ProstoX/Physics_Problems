@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resistor Combinations Explorer</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --wire: #475569;
+            --node: #0f172a;
+            --accent: #eff6ff;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 2rem 1rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+        }
+
+        .layout {
+            display: flex;
+            gap: 2rem;
+            align-items: stretch;
+        }
+
+        .visual-panel {
+            flex: 1.5;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .canvas-card {
+            background: var(--surface);
+            border-radius: 1rem;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 350px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        button {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            padding: 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        button:hover {
+            border-color: var(--primary);
+            background: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        button.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .math-panel {
+            flex: 1;
+            background: var(--surface);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .math-panel h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .step-box {
+            margin-bottom: 1.5rem;
+            flex-grow: 1;
+        }
+
+        .step {
+            margin-bottom: 1rem;
+            font-size: 1.05rem;
+            background: var(--bg-color);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .step-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .final-result {
+            background: var(--accent);
+            border: 2px solid var(--primary);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            text-align: center;
+            margin-top: auto;
+        }
+
+        .final-result .label {
+            font-size: 0.9rem;
+            color: var(--primary);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .final-result .value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        /* Fraction Math CSS */
+        .frac {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 0.25rem;
+            font-size: 0.95em;
+            line-height: 1.2;
+        }
+        .frac > span { padding: 0 0.2rem; }
+        .frac .num { border-bottom: 2px solid currentColor; }
+
+        @media (max-width: 850px) {
+            .layout { flex-direction: column; }
+            .controls { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Resistor Combinations</h1>
+            <p>Explore equivalent resistance (R<sub>eq</sub>) with three identical 1 Ω resistors.</p>
+        </header>
+
+        <div class="layout">
+            <div class="visual-panel">
+                <div class="canvas-card">
+                    <canvas id="circuitCanvas" width="600" height="320"></canvas>
+                </div>
+                <div class="controls">
+                    <button class="active" onclick="setConfig('series', this)">All in Series</button>
+                    <button onclick="setConfig('parallel', this)">All in Parallel</button>
+                    <button onclick="setConfig('parallel_series', this)">Two Parallel, One Series</button>
+                    <button onclick="setConfig('series_parallel', this)">Two Series, One Parallel</button>
+                </div>
+            </div>
+
+            <div class="math-panel">
+                <h2>Mathematical Breakdown</h2>
+                <div id="mathContent" class="step-box">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="final-result" id="finalResult">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('circuitCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Handle High DPI Displays
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const width = 600;
+        const height = 320;
+        
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+
+        // Drawing Utilities
+        function drawTerminals() {
+            ctx.lineWidth = 3;
+            // Terminal A
+            ctx.beginPath(); ctx.arc(68, 160, 8, 0, Math.PI * 2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.strokeStyle = '#0f172a'; ctx.stroke();
+            ctx.fillStyle = '#0f172a'; ctx.font = 'bold 16px system-ui';
+            ctx.textAlign = 'right'; ctx.fillText('A', 50, 166);
+
+            // Terminal B
+            ctx.beginPath(); ctx.arc(532, 160, 8, 0, Math.PI * 2);
+            ctx.fillStyle = 'white'; ctx.fill();
+            ctx.strokeStyle = '#0f172a'; ctx.stroke();
+            ctx.fillStyle = '#0f172a'; ctx.textAlign = 'left';
+            ctx.fillText('B', 550, 166);
+        }
+
+        function drawResistor(cx, cy, label) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx - 40, cy);
+            ctx.lineTo(cx - 25, cy);
+            // Zig-zag
+            ctx.lineTo(cx - 18, cy - 12);
+            ctx.lineTo(cx - 5, cy + 12);
+            ctx.lineTo(cx + 8, cy - 12);
+            ctx.lineTo(cx + 21, cy + 12);
+            ctx.lineTo(cx + 28, cy);
+            
+            ctx.lineTo(cx + 40, cy);
+
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            // Labels
+            ctx.fillStyle = '#1e293b';
+            ctx.font = '600 14px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, cx, cy - 20);
+            
+            ctx.fillStyle = '#64748b';
+            ctx.font = '12px system-ui';
+            ctx.fillText('1 Ω', cx, cy + 24);
+            ctx.restore();
+        }
+
+        function drawWires(lines) {
+            ctx.beginPath();
+            lines.forEach(l => {
+                ctx.moveTo(l[0], l[1]);
+                ctx.lineTo(l[2], l[3]);
+            });
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        function drawNodes(points) {
+            ctx.fillStyle = '#0f172a';
+            points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p[0], p[1], 4.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Circuit Configurations
+        const configs = {
+            series: {
+                draw: () => {
+                    drawWires([
+                        [68, 160, 140, 160],   // A to R1
+                        [220, 160, 260, 160],  // R1 to R2
+                        [340, 160, 380, 160],  // R2 to R3
+                        [460, 160, 532, 160]   // R3 to B
+                    ]);
+                    drawResistor(180, 160, 'R₁');
+                    drawResistor(300, 160, 'R₂');
+                    drawResistor(420, 160, 'R₃');
+                },
+                mathHTML: `
+                    <div class="step">
+                        <div class="step-title">Formula</div>
+                        R<sub>eq</sub> = R<sub>1</sub> + R<sub>2</sub> + R<sub>3</sub>
+                    </div>
+                    <div class="step">
+                        <div class="step-title">Calculation</div>
+                        R<sub>eq</sub> = 1 + 1 + 1
+                    </div>
+                `,
+                finalHTML: `
+                    <div class="label">Total Equivalent Resistance</div>
+                    <div class="value">3 Ω</div>
+                `
+            },
+            parallel: {
+                draw: () => {
+                    drawWires([
+                        [68, 160, 160, 160],   // A to split
+                        [160, 70, 160, 250],   // Split vertical
+                        [160, 70, 260, 70],    // Top trunk L
+                        [340, 70, 440, 70],    // Top trunk R
+                        [160, 160, 260, 160],  // Mid trunk L
+                        [340, 160, 440, 160],  // Mid trunk R
+                        [160, 250, 260, 250],  // Bot trunk L
+                        [340, 250, 440, 250],  // Bot trunk R
+                        [440, 70, 440, 250],   // Join vertical
+                        [440, 160, 532, 160]   // Join to B
+                    ]);
+                    drawNodes([
+                        [160, 160], [160, 70], [160, 250],
+                        [440, 160], [440, 70], [440, 250]
+                    ]);
+                    drawResistor(300, 70, 'R₁');
+                    drawResistor(300, 160, 'R₂');
+                    drawResistor(300, 250, 'R₃');
+                },
+                mathHTML: `
+                    <div class="step">
+                        <div class="step-title">Formula</div>
+                        <div class="frac"><span class="num">1</span><span>R<sub>eq</sub></span></div> = 
+                        <div class="frac"><span class="num">1</span><span>R<sub>1</sub></span></div> + 
+                        <div class="frac"><span class="num">1</span><span>R<sub>2</sub></span></div> + 
+                        <div class="frac"><span class="num">1</span><span>R<sub>3</sub></span></div>
+                    </div>
+                    <div class="step">
+                        <div class="step-title">Calculation</div>
+                        <div class="frac"><span class="num">1</span><span>R<sub>eq</sub></span></div> = 
+                        <div class="frac"><span class="num">1</span><span>1</span></div> + 
+                        <div class="frac"><span class="num">1</span><span>1</span></div> + 
+                        <div class="frac"><span class="num">1</span><span>1</span></div> = 3
+                    </div>
+                `,
+                finalHTML: `
+                    <div class="label">Total Equivalent Resistance</div>
+                    <div class="value"><div class="frac"><span class="num">1</span><span>3</span></div> Ω &approx; 0.33 Ω</div>
+                `
+            },
+            parallel_series: {
+                draw: () => {
+                    drawWires([
+                        [68, 160, 120, 160],   // A to split
+                        [120, 100, 120, 220],  // Split vertical
+                        [120, 100, 160, 100],  // Top branch L
+                        [240, 100, 280, 100],  // Top branch R
+                        [120, 220, 160, 220],  // Bot branch L
+                        [240, 220, 280, 220],  // Bot branch R
+                        [280, 100, 280, 220],  // Join vertical
+                        [280, 160, 360, 160],  // Join to R3
+                        [440, 160, 532, 160]   // R3 to B
+                    ]);
+                    drawNodes([
+                        [120, 160], [120, 100], [120, 220],
+                        [280, 160], [280, 100], [280, 220]
+                    ]);
+                    drawResistor(200, 100, 'R₁');
+                    drawResistor(200, 220, 'R₂');
+                    drawResistor(400, 160, 'R₃');
+                },
+                mathHTML: `
+                    <div class="step">
+                        <div class="step-title">1. Parallel Pair (R<sub>1</sub> || R<sub>2</sub>)</div>
+                        R<sub>p</sub> = 
+                        <div class="frac"><span class="num">1 &times; 1</span><span>1 + 1</span></div> = 
+                        <div class="frac"><span class="num">1</span><span>2</span></div> Ω
+                    </div>
+                    <div class="step">
+                        <div class="step-title">2. Add Series R<sub>3</sub></div>
+                        R<sub>eq</sub> = R<sub>p</sub> + R<sub>3</sub> = 
+                        <div class="frac"><span class="num">1</span><span>2</span></div> + 1
+                    </div>
+                `,
+                finalHTML: `
+                    <div class="label">Total Equivalent Resistance</div>
+                    <div class="value">1.5 Ω</div>
+                `
+            },
+            series_parallel: {
+                draw: () => {
+                    drawWires([
+                        [68, 160, 140, 160],   // A to split
+                        [140, 100, 140, 220],  // Split vertical
+                        [140, 100, 200, 100],  // Top series L
+                        [280, 100, 320, 100],  // Top series Mid
+                        [400, 100, 460, 100],  // Top series R
+                        [140, 220, 260, 220],  // Bot parallel L
+                        [340, 220, 460, 220],  // Bot parallel R
+                        [460, 100, 460, 220],  // Join vertical
+                        [460, 160, 532, 160]   // Join to B
+                    ]);
+                    drawNodes([
+                        [140, 160], [140, 100], [140, 220],
+                        [460, 160], [460, 100], [460, 220]
+                    ]);
+                    drawResistor(240, 100, 'R₁');
+                    drawResistor(360, 100, 'R₂');
+                    drawResistor(300, 220, 'R₃');
+                },
+                mathHTML: `
+                    <div class="step">
+                        <div class="step-title">1. Series Pair (R<sub>1</sub> + R<sub>2</sub>)</div>
+                        R<sub>s</sub> = 1 + 1 = 2 Ω
+                    </div>
+                    <div class="step">
+                        <div class="step-title">2. Parallel with R<sub>3</sub> (R<sub>s</sub> || R<sub>3</sub>)</div>
+                        R<sub>eq</sub> = 
+                        <div class="frac"><span class="num">R<sub>s</sub> &times; R<sub>3</sub></span><span>R<sub>s</sub> + R<sub>3</sub></span></div> = 
+                        <div class="frac"><span class="num">2 &times; 1</span><span>2 + 1</span></div>
+                    </div>
+                `,
+                finalHTML: `
+                    <div class="label">Total Equivalent Resistance</div>
+                    <div class="value"><div class="frac"><span class="num">2</span><span>3</span></div> Ω &approx; 0.67 Ω</div>
+                `
+            }
+        };
+
+        // State & Animation
+        let currentConfig = 'series';
+        let animationStart = null;
+        let oldConfigKey = null;
+        let newConfigKey = 'series';
+        const ANIMATION_DURATION = 350;
+
+        function renderFrame(time) {
+            ctx.clearRect(0, 0, width, height);
+
+            if (animationStart !== null) {
+                let progress = (time - animationStart) / ANIMATION_DURATION;
+                
+                if (progress >= 1) {
+                    // Animation complete
+                    animationStart = null;
+                    currentConfig = newConfigKey;
+                    
+                    drawTerminals();
+                    configs[currentConfig].draw();
+                    drawTerminals(); // Redraw over lines just in case
+                } else {
+                    // Easing (ease-in-out)
+                    let alpha = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+                    
+                    ctx.save();
+                    ctx.globalAlpha = 1 - alpha;
+                    drawTerminals();
+                    configs[oldConfigKey].draw();
+                    
+                    ctx.globalAlpha = alpha;
+                    drawTerminals();
+                    configs[newConfigKey].draw();
+                    ctx.restore();
+                    
+                    requestAnimationFrame(renderFrame);
+                }
+            } else {
+                drawTerminals();
+                configs[currentConfig].draw();
+            }
+        }
+
+        function setConfig(key, btnElement) {
+            if (key === currentConfig || animationStart !== null) return;
+            
+            // UI Update Buttons
+            document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            // Math Panel Update
+            document.getElementById('mathContent').innerHTML = configs[key].mathHTML;
+            document.getElementById('finalResult').innerHTML = configs[key].finalHTML;
+
+            // Trigger Canvas Animation
+            oldConfigKey = currentConfig;
+            newConfigKey = key;
+            animationStart = performance.now();
+            requestAnimationFrame(renderFrame);
+        }
+
+        // Initial Load
+        document.getElementById('mathContent').innerHTML = configs.series.mathHTML;
+        document.getElementById('finalResult').innerHTML = configs.series.finalHTML;
+        requestAnimationFrame(renderFrame);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Circuit Visualization</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --wire-color: #334155;
+            --particle-color: #fbbf24;
+            --particle-border: #d97706;
+            --positive-color: #ef4444;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            max-width: 700px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            margin-bottom: 25px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px rgba(37, 99, 235, 0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .canvas-container {
+            background: #ffffff;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .dashboard {
+            display: flex;
+            gap: 20px;
+        }
+
+        .metric-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px 20px;
+            flex: 1;
+            text-align: left;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .metric-value span {
+            font-size: 18px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        @media (max-width: 600px) {
+            .dashboard { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Circuit Simulator</h1>
+        
+        <div class="controls">
+            <button id="toggleBtn" onclick="toggleCircuit()">Switch to Parallel Layout</button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="circuitCanvas"></canvas>
+        </div>
+
+        <div class="dashboard">
+            <div class="metric-card">
+                <div class="metric-label">Total Equivalent Resistance (R<sub>eq</sub>)</div>
+                <div class="metric-value" id="req-val">-- <span>&Omega;</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Total Current (I<sub>total</sub>)</div>
+                <div class="metric-value" id="itot-val">-- <span>A</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('circuitCanvas');
+        const ctx = canvas.getContext('2d');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const reqVal = document.getElementById('req-val');
+        const itotVal = document.getElementById('itot-val');
+
+        // Handle high DPI displays for crisp rendering
+        const width = 600;
+        const height = 400;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.scale(dpr, dpr);
+
+        // Circuit Constants
+        let isSeries = true;
+        const V = 12;
+        const R1 = 15;
+        const R2 = 30;
+        const R3 = 50;
+
+        let Itotal = 0;
+        let Req = 0;
+        
+        // Animation State
+        let particles = [];
+        let lastTime = performance.now();
+
+        // Path definitions for particles
+        const sTrack = [
+            {x: 100, y: 190}, {x: 100, y: 100}, {x: 500, y: 100}, 
+            {x: 500, y: 300}, {x: 100, y: 300}, {x: 100, y: 210}
+        ];
+        
+        const pTrack1 = [
+            {x: 100, y: 190}, {x: 100, y: 100}, {x: 200, y: 100}, 
+            {x: 200, y: 300}, {x: 100, y: 300}, {x: 100, y: 210}
+        ];
+        
+        const pTrack2 = [
+            {x: 100, y: 190}, {x: 100, y: 100}, {x: 300, y: 100}, 
+            {x: 300, y: 300}, {x: 100, y: 300}, {x: 100, y: 210}
+        ];
+        
+        const pTrack3 = [
+            {x: 100, y: 190}, {x: 100, y: 100}, {x: 400, y: 100}, 
+            {x: 400, y: 300}, {x: 100, y: 300}, {x: 100, y: 210}
+        ];
+
+        // Utility: Calculate total pixel length of a path
+        function getTrackLength(track) {
+            let len = 0;
+            for (let i = 0; i < track.length - 1; i++) {
+                let dx = track[i+1].x - track[i].x;
+                let dy = track[i+1].y - track[i].y;
+                len += Math.sqrt(dx*dx + dy*dy);
+            }
+            return len;
+        }
+
+        // Utility: Find exact x,y coordinates at a given distance along a path
+        function getPointOnTrack(track, dist) {
+            let currentDist = 0;
+            for (let i = 0; i < track.length - 1; i++) {
+                let dx = track[i+1].x - track[i].x;
+                let dy = track[i+1].y - track[i].y;
+                let segmentLen = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist <= currentDist + segmentLen) {
+                    let ratio = (dist - currentDist) / segmentLen;
+                    return {
+                        x: track[i].x + dx * ratio,
+                        y: track[i].y + dy * ratio
+                    };
+                }
+                currentDist += segmentLen;
+            }
+            return track[track.length - 1];
+        }
+
+        function calculateCircuit() {
+            // Physics calculations
+            if (isSeries) {
+                Req = R1 + R2 + R3;
+            } else {
+                Req = 1 / ((1 / R1) + (1 / R2) + (1 / R3));
+            }
+            Itotal = V / Req;
+
+            // Update UI Dashboard
+            reqVal.innerHTML = `${Req.toFixed(2)} <span>&Omega;</span>`;
+            itotVal.innerHTML = `${Itotal.toFixed(2)} <span>A</span>`;
+            
+            resetParticles();
+        }
+
+        function resetParticles() {
+            particles = [];
+            if (isSeries) {
+                let len = getTrackLength(sTrack);
+                let numParticles = 16;
+                for(let i = 0; i < numParticles; i++) {
+                    particles.push({ track: sTrack, dist: (i / numParticles) * len, trackLen: len });
+                }
+            } else {
+                let tracks = [pTrack1, pTrack2, pTrack3];
+                // Spawn dots proportional to the path length to maintain visual density
+                let counts = [6, 8, 10]; 
+                
+                tracks.forEach((t, i) => {
+                    let len = getTrackLength(t);
+                    for(let j = 0; j < counts[i]; j++) {
+                        // Stagger particles so they interleave on the shared main wire
+                        let offset = (i * len / 3); 
+                        particles.push({ track: t, dist: ((j / counts[i]) * len + offset) % len, trackLen: len });
+                    }
+                });
+            }
+        }
+
+        function toggleCircuit() {
+            isSeries = !isSeries;
+            toggleBtn.innerText = isSeries ? 'Switch to Parallel Layout' : 'Switch to Series Layout';
+            calculateCircuit();
+        }
+
+        function drawResistor(x, y, isHorizontal, label, value) {
+            ctx.save();
+            ctx.translate(x, y);
+            if (!isHorizontal) ctx.rotate(Math.PI / 2);
+            
+            // Draw zigzag
+            ctx.beginPath();
+            ctx.moveTo(-30, 0);
+            ctx.lineTo(-20, 0);
+            ctx.lineTo(-15, -12);
+            ctx.lineTo(-5, 12);
+            ctx.lineTo(5, -12);
+            ctx.lineTo(15, 12);
+            ctx.lineTo(20, 0);
+            ctx.lineTo(30, 0);
+            
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'miter';
+            ctx.stroke();
+            ctx.restore();
+            
+            // Draw text labels
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 15px sans-serif';
+            ctx.textAlign = 'center';
+            
+            if (isHorizontal) {
+                ctx.fillText(label, x, y - 22);
+                ctx.fillStyle = '#64748b';
+                ctx.font = '13px sans-serif';
+                ctx.fillText(`${value} Ω`, x, y + 26);
+            } else {
+                ctx.fillText(label, x + 35, y - 6);
+                ctx.fillStyle = '#64748b';
+                ctx.font = '13px sans-serif';
+                ctx.fillText(`${value} Ω`, x + 35, y + 14);
+            }
+        }
+
+        function drawBattery(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Connecting wire ends
+            ctx.beginPath();
+            ctx.moveTo(0, -20); ctx.lineTo(0, -12);
+            ctx.moveTo(0, 20); ctx.lineTo(0, 12);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Positive terminal (top, red, long)
+            ctx.beginPath();
+            ctx.moveTo(-24, -12); ctx.lineTo(24, -12);
+            ctx.strokeStyle = '#ef4444'; 
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Negative terminal (bottom, dark, short, thick)
+            ctx.beginPath();
+            ctx.moveTo(-12, 12); ctx.lineTo(12, 12);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            // Voltage Text
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('12V', -35, 6);
+            
+            // Plus symbol
+            ctx.fillStyle = '#ef4444';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText('+', 24, -18);
+
+            ctx.restore();
+        }
+
+        function drawCircuitDiagram() {
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (isSeries) {
+                // Background Wires (Series)
+                ctx.beginPath();
+                ctx.moveTo(100, 190); ctx.lineTo(100, 100);
+                ctx.lineTo(170, 100); // Wait for R1
+                ctx.moveTo(230, 100); ctx.lineTo(270, 100); // R1 to R2
+                ctx.moveTo(330, 100); ctx.lineTo(370, 100); // R2 to R3
+                ctx.moveTo(430, 100); ctx.lineTo(500, 100); // R3 to Right Wall
+                ctx.lineTo(500, 300); // Right Wall
+                ctx.lineTo(100, 300); // Bottom Wall
+                ctx.lineTo(100, 210); // Back to battery
+                ctx.stroke();
+
+                // Draw Components
+                drawResistor(200, 100, true, 'R1', R1);
+                drawResistor(300, 100, true, 'R2', R2);
+                drawResistor(400, 100, true, 'R3', R3);
+            } else {
+                // Background Wires (Parallel)
+                ctx.beginPath();
+                ctx.moveTo(100, 190); ctx.lineTo(100, 100);
+                ctx.lineTo(400, 100); // Top Trunk
+                ctx.moveTo(400, 300); ctx.lineTo(100, 300); // Bottom Trunk
+                ctx.lineTo(100, 210); // Back to battery
+                
+                // Branches
+                ctx.moveTo(200, 100); ctx.lineTo(200, 170); // B1 Top
+                ctx.moveTo(200, 230); ctx.lineTo(200, 300); // B1 Bot
+                
+                ctx.moveTo(300, 100); ctx.lineTo(300, 170); // B2 Top
+                ctx.moveTo(300, 230); ctx.lineTo(300, 300); // B2 Bot
+                
+                ctx.moveTo(400, 100); ctx.lineTo(400, 170); // B3 Top
+                ctx.moveTo(400, 230); ctx.lineTo(400, 300); // B3 Bot
+                
+                ctx.stroke();
+
+                // Draw Components
+                drawResistor(200, 200, false, 'R1', R1);
+                drawResistor(300, 200, false, 'R2', R2);
+                drawResistor(400, 200, false, 'R3', R3);
+                
+                // Draw Connection Nodes (Dots)
+                ctx.fillStyle = '#64748b';
+                [200, 300, 400].forEach(x => {
+                    ctx.beginPath(); ctx.arc(x, 100, 5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(x, 300, 5, 0, Math.PI*2); ctx.fill();
+                });
+            }
+            
+            // Draw Battery
+            drawBattery(100, 200);
+        }
+
+        function renderLoop(time) {
+            let dt = (time - lastTime) / 1000;
+            // Prevent huge jumps if tab is inactive
+            if (dt > 0.1) dt = 0.016; 
+            lastTime = time;
+
+            // Clear frame
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw static circuit lines and components
+            drawCircuitDiagram();
+
+            // The speed of current dots visually represents the physical current.
+            // Since parallel current (1.44A) is ~11x higher than series (0.126A),
+            // this proportional formula makes dots noticeably race in parallel mode.
+            let speed = Math.max(30, Itotal * 120 + 20);
+
+            // Render current flowing (dots)
+            ctx.fillStyle = '#fbbf24';
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 1.5;
+
+            particles.forEach(p => {
+                p.dist += speed * dt;
+                // Loop around track
+                if (p.dist > p.trackLen) p.dist %= p.trackLen;
+                
+                let pos = getPointOnTrack(p.track, p.dist);
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 4.5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        // Initialize state and start loop
+        calculateCircuit();
+        requestAnimationFrame(renderLoop);
+    </script>
+</body>
+</html>

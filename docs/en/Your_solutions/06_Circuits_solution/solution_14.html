@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RLC Circuit ↔ Damped Harmonic Oscillator</title>
+<style>
+:root{
+    --bg:#f5f7fb;
+    --panel:#ffffff;
+    --text:#111827;
+    --muted:#6b7280;
+    --accent:#4f46e5;
+    --accent2:#06b6d4;
+    --grid:#d1d5db;
+    --line:#1f2937;
+    --good:#10b981;
+    --warn:#f59e0b;
+}
+
+body.dark{
+    --bg:#0f172a;
+    --panel:#111827;
+    --text:#f3f4f6;
+    --muted:#94a3b8;
+    --accent:#818cf8;
+    --accent2:#22d3ee;
+    --grid:#334155;
+    --line:#e5e7eb;
+    --good:#34d399;
+    --warn:#fbbf24;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    font-family:Inter,Segoe UI,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    transition:0.3s;
+}
+
+header{
+    padding:18px 24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px solid var(--grid);
+}
+
+header h1{
+    margin:0;
+    font-size:1.5rem;
+}
+
+.container{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    padding:16px;
+}
+
+.panel{
+    background:var(--panel);
+    border-radius:18px;
+    padding:16px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.08);
+    min-height:480px;
+}
+
+.panel h2{
+    margin-top:0;
+}
+
+.canvasWrap{
+    width:100%;
+    height:340px;
+    border-radius:12px;
+    overflow:hidden;
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.03));
+    border:1px solid var(--grid);
+}
+
+svg{
+    width:100%;
+    height:100%;
+}
+
+.controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:12px;
+    margin-top:16px;
+}
+
+.control{
+    background:rgba(127,127,127,0.08);
+    padding:10px;
+    border-radius:12px;
+}
+
+.control label{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.9rem;
+    margin-bottom:6px;
+}
+
+input[type=range]{
+    width:100%;
+}
+
+.buttons{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+    flex-wrap:wrap;
+}
+
+button{
+    border:none;
+    padding:10px 18px;
+    border-radius:10px;
+    background:var(--accent);
+    color:white;
+    cursor:pointer;
+    font-weight:600;
+    transition:0.2s;
+}
+
+button:hover{
+    transform:translateY(-1px);
+}
+
+.secondary{
+    background:var(--accent2);
+}
+
+.stats{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:12px;
+}
+
+.stat{
+    background:rgba(127,127,127,0.08);
+    border-radius:12px;
+    padding:12px;
+}
+
+.equation{
+    margin-top:10px;
+    padding:12px;
+    background:rgba(127,127,127,0.08);
+    border-radius:12px;
+    font-family:"Times New Roman", serif;
+    overflow:auto;
+}
+
+.graphPanel{
+    margin:16px;
+    background:var(--panel);
+    border-radius:18px;
+    padding:16px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.08);
+}
+
+#graph{
+    width:100%;
+    height:260px;
+    border-radius:12px;
+    border:1px solid var(--grid);
+    background:rgba(127,127,127,0.03);
+}
+
+.tableWrap{
+    margin:16px;
+    background:var(--panel);
+    border-radius:18px;
+    padding:16px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.08);
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td{
+    border:1px solid var(--grid);
+    padding:12px;
+    text-align:center;
+}
+
+th{
+    background:rgba(127,127,127,0.08);
+}
+
+.modeToggle{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+footer{
+    text-align:center;
+    color:var(--muted);
+    padding:18px;
+}
+
+@media(max-width:1000px){
+    .container{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Series RLC Circuit ↔ Damped Harmonic Oscillator</h1>
+
+    <div class="modeToggle">
+        <span>🌞</span>
+        <input type="checkbox" id="modeToggle">
+        <span>🌙</span>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- LEFT PANEL -->
+    <div class="panel">
+        <h2>Series RLC Circuit</h2>
+
+        <div class="canvasWrap">
+            <svg id="rlcSVG" viewBox="0 0 800 340">
+
+                <!-- wires -->
+                <path d="M80 170 H160" stroke="var(--line)" stroke-width="4" fill="none"/>
+                <path d="M240 170 H320" stroke="var(--line)" stroke-width="4" fill="none"/>
+                <path d="M420 170 H500" stroke="var(--line)" stroke-width="4" fill="none"/>
+                <path d="M620 170 H700" stroke="var(--line)" stroke-width="4" fill="none"/>
+                <path d="M700 170 V280 H80 V170" stroke="var(--line)" stroke-width="4" fill="none"/>
+
+                <!-- source -->
+                <circle cx="200" cy="170" r="40" stroke="var(--accent2)" stroke-width="4" fill="none"/>
+                <text x="188" y="178" fill="var(--text)" font-size="28">~</text>
+                <text x="170" y="120" fill="var(--text)">Voltage Source V(t)</text>
+
+                <!-- resistor -->
+                <polyline points="320,170 340,150 360,190 380,150 400,190 420,170"
+                          fill="none" stroke="var(--warn)" stroke-width="4"/>
+                <text x="350" y="120" fill="var(--text)">Resistance R</text>
+
+                <!-- inductor -->
+                <path d="M500 170
+                         c10 -40 30 -40 40 0
+                         c10 -40 30 -40 40 0
+                         c10 -40 30 -40 40 0"
+                      fill="none"
+                      stroke="var(--good)"
+                      stroke-width="4"/>
+                <text x="520" y="120" fill="var(--text)">Inductance L</text>
+
+                <!-- capacitor -->
+                <line x1="620" y1="140" x2="620" y2="200" stroke="var(--accent)" stroke-width="5"/>
+                <line x1="650" y1="140" x2="650" y2="200" stroke="var(--accent)" stroke-width="5"/>
+                <text x="600" y="120" fill="var(--text)">Capacitance C</text>
+
+                <!-- current particles -->
+                <g id="currentDots"></g>
+
+                <!-- energy bars -->
+                <rect x="90" y="40" width="30" height="120" fill="none" stroke="var(--grid)"/>
+                <rect id="capEnergy" x="90" y="160" width="30" height="0" fill="var(--accent)"/>
+                <text x="60" y="25" fill="var(--text)">Capacitor Energy</text>
+
+                <rect x="140" y="40" width="30" height="120" fill="none" stroke="var(--grid)"/>
+                <rect id="indEnergy" x="140" y="160" width="30" height="0" fill="var(--good)"/>
+                <text x="130" y="25" fill="var(--text)">Inductor Energy</text>
+
+                <!-- labels -->
+                <text id="currentLabel" x="330" y="245" fill="var(--text)">
+                    I(t)=0
+                </text>
+
+            </svg>
+        </div>
+
+        <div class="equation">
+            <strong>Differential Equation:</strong><br><br>
+            L d²I/dt² + R dI/dt + (1/C) I = 0
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel">
+        <h2>Damped Harmonic Oscillator</h2>
+
+        <div class="canvasWrap">
+            <svg id="mechSVG" viewBox="0 0 800 340">
+
+                <!-- wall -->
+                <rect x="40" y="90" width="30" height="160" fill="var(--line)"/>
+
+                <!-- spring -->
+                <path id="springPath"
+                      d="M70 170
+                         L110 170
+                         L130 140
+                         L150 200
+                         L170 140
+                         L190 200
+                         L210 140
+                         L230 200
+                         L250 170
+                         L320 170"
+                      fill="none"
+                      stroke="var(--accent)"
+                      stroke-width="4"/>
+
+                <!-- damper -->
+                <line x1="70" y1="240" x2="150" y2="240" stroke="var(--warn)" stroke-width="4"/>
+                <rect x="150" y="220" width="30" height="40" fill="none" stroke="var(--warn)" stroke-width="4"/>
+                <line id="damperRod" x1="180" y1="240" x2="320" y2="240" stroke="var(--warn)" stroke-width="4"/>
+
+                <!-- mass -->
+                <rect id="mass" x="320" y="120" width="120" height="100"
+                      rx="12" fill="var(--good)"/>
+
+                <!-- floor -->
+                <line x1="0" y1="280" x2="800" y2="280"
+                      stroke="var(--grid)" stroke-width="3"/>
+
+                <!-- labels -->
+                <text x="350" y="175" fill="#fff" font-size="28">m</text>
+
+                <text x="90" y="100" fill="var(--text)">Spring Constant k</text>
+                <text x="90" y="215" fill="var(--text)">Damping b</text>
+
+                <text id="xLabel" x="340" y="95" fill="var(--text)">
+                    x(t)=0
+                </text>
+
+            </svg>
+        </div>
+
+        <div class="equation">
+            <strong>Differential Equation:</strong><br><br>
+            m d²x/dt² + b dx/dt + kx = 0
+        </div>
+    </div>
+
+</div>
+
+<!-- CONTROLS -->
+<div class="graphPanel">
+
+    <h2>Interactive Controls</h2>
+
+    <div class="controls">
+
+        <div class="control">
+            <label>R <span id="RVal">1.0</span></label>
+            <input id="R" type="range" min="0.1" max="10" step="0.1" value="1">
+        </div>
+
+        <div class="control">
+            <label>L <span id="LVal">1.0</span></label>
+            <input id="L" type="range" min="0.2" max="10" step="0.1" value="1">
+        </div>
+
+        <div class="control">
+            <label>C <span id="CVal">1.0</span></label>
+            <input id="C" type="range" min="0.2" max="10" step="0.1" value="1">
+        </div>
+
+        <div class="control">
+            <label>m <span id="mVal">1.0</span></label>
+            <input id="m" type="range" min="0.2" max="10" step="0.1" value="1">
+        </div>
+
+        <div class="control">
+            <label>b <span id="bVal">0.5</span></label>
+            <input id="b" type="range" min="0.1" max="10" step="0.1" value="0.5">
+        </div>
+
+        <div class="control">
+            <label>k <span id="kVal">4.0</span></label>
+            <input id="k" type="range" min="0.2" max="20" step="0.1" value="4">
+        </div>
+
+    </div>
+
+    <div class="buttons">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn" class="secondary">Pause</button>
+        <button id="resetBtn">Reset</button>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <strong>RLC Natural Frequency</strong>
+            <div id="freqRLC">0 Hz</div>
+        </div>
+
+        <div class="stat">
+            <strong>RLC Damping</strong>
+            <div id="dampRLC">0</div>
+        </div>
+
+        <div class="stat">
+            <strong>Mechanical Frequency</strong>
+            <div id="freqMech">0 Hz</div>
+        </div>
+
+        <div class="stat">
+            <strong>Mechanical Damping</strong>
+            <div id="dampMech">0</div>
+        </div>
+    </div>
+
+    <h2 style="margin-top:24px;">Oscillation Amplitude vs Time</h2>
+    <canvas id="graph" width="1200" height="260"></canvas>
+</div>
+
+<!-- ANALOGY TABLE -->
+<div class="tableWrap">
+    <h2>Mathematical Analogy</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Electrical System</th>
+                <th>Mechanical System</th>
+                <th>Meaning</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td>L</td>
+                <td>m</td>
+                <td>Inertia / Stored kinetic energy</td>
+            </tr>
+
+            <tr>
+                <td>R</td>
+                <td>b</td>
+                <td>Damping / Energy dissipation</td>
+            </tr>
+
+            <tr>
+                <td>1/C</td>
+                <td>k</td>
+                <td>Restoring force</td>
+            </tr>
+
+            <tr>
+                <td>I(t)</td>
+                <td>x(t)</td>
+                <td>Oscillating state variable</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<footer>
+    Educational visualization showing why a series RLC circuit follows the same mathematics as a damped spring-mass system.
+</footer>
+
+<script>
+const graph = document.getElementById("graph");
+const gctx = graph.getContext("2d");
+
+const currentDots = document.getElementById("currentDots");
+const capEnergy = document.getElementById("capEnergy");
+const indEnergy = document.getElementById("indEnergy");
+
+const mass = document.getElementById("mass");
+const springPath = document.getElementById("springPath");
+const damperRod = document.getElementById("damperRod");
+
+const currentLabel = document.getElementById("currentLabel");
+const xLabel = document.getElementById("xLabel");
+
+const modeToggle = document.getElementById("modeToggle");
+
+let running = false;
+let t = 0;
+
+let graphDataRLC = [];
+let graphDataMech = [];
+
+const params = {
+    R:1,
+    L:1,
+    C:1,
+    m:1,
+    b:0.5,
+    k:4
+};
+
+const sliders = ["R","L","C","m","b","k"];
+
+sliders.forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener("input", ()=>{
+        params[id] = parseFloat(el.value);
+        document.getElementById(id+"Val").innerText = el.value;
+        updateStats();
+    });
+});
+
+function updateStats(){
+
+    const wRLC = Math.sqrt(1/(params.L*params.C));
+    const dampingRLC = params.R/(2*params.L);
+
+    const wMech = Math.sqrt(params.k/params.m);
+    const dampingMech = params.b/(2*params.m);
+
+    document.getElementById("freqRLC").innerText =
+        (wRLC/(2*Math.PI)).toFixed(2)+" Hz";
+
+    document.getElementById("dampRLC").innerText =
+        dampingRLC.toFixed(2);
+
+    document.getElementById("freqMech").innerText =
+        (wMech/(2*Math.PI)).toFixed(2)+" Hz";
+
+    document.getElementById("dampMech").innerText =
+        dampingMech.toFixed(2);
+}
+
+updateStats();
+
+function createCurrentDots(amplitude){
+
+    currentDots.innerHTML = "";
+
+    const path = [
+        [80,170],[700,170],[700,280],[80,280],[80,170]
+    ];
+
+    const count = 22;
+
+    for(let i=0;i<count;i++){
+
+        const progress =
+            ((t*0.4*amplitude)+(i/count))%1;
+
+        const p = interpolatePath(path, progress);
+
+        const circle = document.createElementNS(
+            "http://www.w3.org/2000/svg","circle"
+        );
+
+        circle.setAttribute("cx", p.x);
+        circle.setAttribute("cy", p.y);
+        circle.setAttribute("r", 4);
+        circle.setAttribute("fill","var(--accent2)");
+
+        currentDots.appendChild(circle);
+    }
+}
+
+function interpolatePath(points, progress){
+
+    let lengths = [];
+    let total = 0;
+
+    for(let i=0;i<points.length-1;i++){
+        const dx = points[i+1][0]-points[i][0];
+        const dy = points[i+1][1]-points[i][1];
+        const len = Math.sqrt(dx*dx+dy*dy);
+
+        lengths.push(len);
+        total += len;
+    }
+
+    let target = progress * total;
+    let accum = 0;
+
+    for(let i=0;i<lengths.length;i++){
+
+        if(accum + lengths[i] >= target){
+
+            const ratio =
+                (target-accum)/lengths[i];
+
+            return {
+                x: points[i][0] +
+                    (points[i+1][0]-points[i][0])*ratio,
+                y: points[i][1] +
+                    (points[i+1][1]-points[i][1])*ratio
+            };
+        }
+
+        accum += lengths[i];
+    }
+
+    return {x:80,y:170};
+}
+
+function drawGraph(){
+
+    gctx.clearRect(0,0,graph.width,graph.height);
+
+    gctx.strokeStyle = getComputedStyle(document.body)
+        .getPropertyValue('--grid');
+
+    for(let x=0;x<graph.width;x+=80){
+        gctx.beginPath();
+        gctx.moveTo(x,0);
+        gctx.lineTo(x,graph.height);
+        gctx.stroke();
+    }
+
+    for(let y=0;y<graph.height;y+=40){
+        gctx.beginPath();
+        gctx.moveTo(0,y);
+        gctx.lineTo(graph.width,y);
+        gctx.stroke();
+    }
+
+    // center line
+    gctx.beginPath();
+    gctx.moveTo(0,graph.height/2);
+    gctx.lineTo(graph.width,graph.height/2);
+    gctx.strokeStyle="#888";
+    gctx.stroke();
+
+    // RLC
+    gctx.beginPath();
+    gctx.strokeStyle="#06b6d4";
+
+    graphDataRLC.forEach((v,i)=>{
+        const x = i;
+        const y = graph.height/2 - v*70;
+
+        if(i===0) gctx.moveTo(x,y);
+        else gctx.lineTo(x,y);
+    });
+
+    gctx.stroke();
+
+    // Mechanical
+    gctx.beginPath();
+    gctx.strokeStyle="#10b981";
+
+    graphDataMech.forEach((v,i)=>{
+        const x = i;
+        const y = graph.height/2 - v*70;
+
+        if(i===0) gctx.moveTo(x,y);
+        else gctx.lineTo(x,y);
+    });
+
+    gctx.stroke();
+
+    gctx.fillStyle = getComputedStyle(document.body)
+        .getPropertyValue('--text');
+
+    gctx.fillText("Blue: RLC Current I(t)",20,20);
+    gctx.fillText("Green: Mechanical Displacement x(t)",20,40);
+}
+
+function animate(){
+
+    requestAnimationFrame(animate);
+
+    if(!running) return;
+
+    t += 0.016;
+
+    // RLC damped oscillation
+    const alpha = params.R/(2*params.L);
+    const omega0 = Math.sqrt(1/(params.L*params.C));
+
+    const omega =
+        Math.sqrt(Math.max(omega0*omega0 - alpha*alpha,0.01));
+
+    const current =
+        Math.exp(-alpha*t) * Math.cos(omega*t);
+
+    // Mechanical oscillator
+    const beta = params.b/(2*params.m);
+    const omegaM0 = Math.sqrt(params.k/params.m);
+
+    const omegaM =
+        Math.sqrt(Math.max(omegaM0*omegaM0 - beta*beta,0.01));
+
+    const x =
+        Math.exp(-beta*t) * Math.cos(omegaM*t);
+
+    // labels
+    currentLabel.textContent =
+        "I(t) = " + current.toFixed(3);
+
+    xLabel.textContent =
+        "x(t) = " + x.toFixed(3);
+
+    // energy animation
+    const capE = Math.cos(omega*t)**2;
+    const indE = Math.sin(omega*t)**2;
+
+    capEnergy.setAttribute("y", 160 - capE*120);
+    capEnergy.setAttribute("height", capE*120);
+
+    indEnergy.setAttribute("y", 160 - indE*120);
+    indEnergy.setAttribute("height", indE*120);
+
+    createCurrentDots(current);
+
+    // mass motion
+    const offset = x * 120;
+
+    mass.setAttribute("x", 320 + offset);
+
+    damperRod.setAttribute("x2", 320 + offset);
+
+    // dynamic spring
+    const start = 70;
+    const end = 320 + offset;
+
+    const seg = (end-start)/8;
+
+    let d = `M ${start} 170`;
+
+    for(let i=1;i<8;i++){
+        const xx = start + seg*i;
+        const yy = i%2===0 ? 140 : 200;
+        d += ` L ${xx} ${yy}`;
+    }
+
+    d += ` L ${end} 170`;
+
+    springPath.setAttribute("d", d);
+
+    // graph data
+    graphDataRLC.push(current);
+    graphDataMech.push(x);
+
+    if(graphDataRLC.length > graph.width){
+        graphDataRLC.shift();
+        graphDataMech.shift();
+    }
+
+    drawGraph();
+}
+
+animate();
+
+document.getElementById("startBtn")
+.addEventListener("click", ()=>{
+    running = true;
+});
+
+document.getElementById("pauseBtn")
+.addEventListener("click", ()=>{
+    running = false;
+});
+
+document.getElementById("resetBtn")
+.addEventListener("click", ()=>{
+    running = false;
+    t = 0;
+    graphDataRLC = [];
+    graphDataMech = [];
+    drawGraph();
+});
+
+modeToggle.addEventListener("change", ()=>{
+    document.body.classList.toggle("dark");
+    drawGraph();
+});
+
+drawGraph();
+</script>
+
+</body>
+</html>

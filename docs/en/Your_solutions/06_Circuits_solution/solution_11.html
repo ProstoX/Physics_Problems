@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Power & Energy in a Resistor</title>
+
+<style>
+    :root{
+        --bg:#f4f7fb;
+        --card:#ffffff;
+        --primary:#4f7cff;
+        --secondary:#7a8cff;
+        --accent:#22c55e;
+        --text:#1e293b;
+        --muted:#64748b;
+        --border:#dbe4f0;
+        --glow:rgba(79,124,255,0.15);
+    }
+
+    *{
+        box-sizing:border-box;
+    }
+
+    body{
+        margin:0;
+        font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background:linear-gradient(180deg,#eef4ff,#f9fbff);
+        color:var(--text);
+        line-height:1.6;
+    }
+
+    .container{
+        width:min(1200px,92%);
+        margin:auto;
+        padding:30px 0 60px;
+    }
+
+    h1{
+        text-align:center;
+        margin-bottom:10px;
+        font-size:clamp(2rem,4vw,3rem);
+    }
+
+    .subtitle{
+        text-align:center;
+        color:var(--muted);
+        margin-bottom:35px;
+        font-size:1.05rem;
+    }
+
+    .grid{
+        display:grid;
+        grid-template-columns:1.1fr 1fr;
+        gap:24px;
+    }
+
+    @media(max-width:900px){
+        .grid{
+            grid-template-columns:1fr;
+        }
+    }
+
+    .card{
+        background:var(--card);
+        border:1px solid var(--border);
+        border-radius:20px;
+        padding:24px;
+        box-shadow:0 12px 30px rgba(0,0,0,0.05);
+    }
+
+    .section-title{
+        font-size:1.25rem;
+        margin-bottom:16px;
+        color:var(--primary);
+        font-weight:700;
+    }
+
+    .problem{
+        background:linear-gradient(135deg,#4f7cff,#6f8fff);
+        color:white;
+        border-radius:18px;
+        padding:24px;
+        margin-bottom:24px;
+        box-shadow:0 10px 30px rgba(79,124,255,0.3);
+    }
+
+    .problem h2{
+        margin-top:0;
+    }
+
+    .known-values{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+        gap:16px;
+        margin-top:20px;
+    }
+
+    .value-box{
+        background:white;
+        color:var(--text);
+        border-radius:14px;
+        padding:16px;
+        text-align:center;
+        border:1px solid rgba(255,255,255,0.3);
+    }
+
+    .value{
+        font-size:1.6rem;
+        font-weight:700;
+        color:var(--primary);
+    }
+
+    .unit{
+        color:var(--muted);
+        font-weight:600;
+    }
+
+    .formula{
+        background:#eef4ff;
+        border-left:5px solid var(--primary);
+        border-radius:12px;
+        padding:18px;
+        margin:16px 0;
+        font-size:1.2rem;
+        overflow:hidden;
+    }
+
+    .math{
+        font-family:"Trebuchet MS",sans-serif;
+        font-weight:700;
+        color:#0f172a;
+    }
+
+    .steps{
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        margin-top:20px;
+    }
+
+    .step{
+        opacity:0;
+        transform:translateY(12px);
+        background:#f8fbff;
+        border:1px solid var(--border);
+        border-radius:14px;
+        padding:16px;
+        transition:all 0.7s ease;
+    }
+
+    .step.show{
+        opacity:1;
+        transform:translateY(0);
+    }
+
+    .step-number{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:32px;
+        height:32px;
+        border-radius:50%;
+        background:var(--primary);
+        color:white;
+        font-weight:bold;
+        margin-right:10px;
+    }
+
+    .highlight{
+        color:var(--accent);
+        font-weight:700;
+    }
+
+    .controls{
+        display:grid;
+        gap:18px;
+        margin-top:18px;
+    }
+
+    .control{
+        background:#f8fbff;
+        border:1px solid var(--border);
+        border-radius:14px;
+        padding:14px;
+    }
+
+    label{
+        display:flex;
+        justify-content:space-between;
+        margin-bottom:8px;
+        font-weight:600;
+    }
+
+    input[type="range"]{
+        width:100%;
+        accent-color:var(--primary);
+    }
+
+    .live-results{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+        gap:18px;
+        margin-top:24px;
+    }
+
+    .result-card{
+        background:linear-gradient(135deg,#ffffff,#eef4ff);
+        border:1px solid var(--border);
+        border-radius:18px;
+        padding:20px;
+        text-align:center;
+    }
+
+    .result-value{
+        font-size:2rem;
+        font-weight:800;
+        color:var(--primary);
+    }
+
+    .summary{
+        margin-top:30px;
+        background:linear-gradient(135deg,#ecfeff,#eff6ff);
+        border:2px solid #c7d9ff;
+        border-radius:20px;
+        padding:24px;
+    }
+
+    .summary h3{
+        margin-top:0;
+        color:var(--primary);
+    }
+
+    .summary-grid{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+        gap:20px;
+    }
+
+    .summary-box{
+        background:white;
+        border-radius:16px;
+        padding:20px;
+        border:1px solid var(--border);
+        text-align:center;
+    }
+
+    .summary-box .big{
+        font-size:2rem;
+        font-weight:800;
+        color:var(--accent);
+    }
+
+    /* Circuit */
+    .circuit-wrap{
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        margin-top:10px;
+        margin-bottom:20px;
+    }
+
+    svg{
+        width:100%;
+        max-width:500px;
+        height:auto;
+    }
+
+    .wire{
+        stroke:#334155;
+        stroke-width:5;
+        fill:none;
+        stroke-linecap:round;
+    }
+
+    .resistor{
+        stroke:#ef4444;
+        stroke-width:5;
+        fill:none;
+        stroke-linejoin:round;
+        stroke-dasharray:400;
+        stroke-dashoffset:400;
+        animation:draw 3s ease forwards infinite alternate;
+    }
+
+    .electron{
+        fill:#4f7cff;
+        animation:moveElectron 3s linear infinite;
+    }
+
+    @keyframes draw{
+        to{
+            stroke-dashoffset:0;
+        }
+    }
+
+    @keyframes moveElectron{
+        0%{ transform:translateX(0px); }
+        50%{ transform:translateX(260px); }
+        100%{ transform:translateX(0px); }
+    }
+
+    .fade{
+        animation:fadeIn 1s ease forwards;
+    }
+
+    @keyframes fadeIn{
+        from{
+            opacity:0;
+            transform:translateY(10px);
+        }
+        to{
+            opacity:1;
+            transform:translateY(0);
+        }
+    }
+
+    .equation{
+        font-size:1.3rem;
+        margin-top:10px;
+        font-weight:700;
+    }
+
+    .glow{
+        box-shadow:0 0 0 10px var(--glow);
+    }
+
+    .footer-note{
+        text-align:center;
+        margin-top:28px;
+        color:var(--muted);
+        font-size:0.95rem;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Power & Energy in a Resistor</h1>
+    <p class="subtitle">
+        Interactive visualization of electrical power dissipation and energy consumption
+    </p>
+
+    <div class="problem">
+        <h2>Problem Statement</h2>
+        <p>
+            What is the power dissipated by a <strong>100 Ω</strong> resistor when a voltage of
+            <strong>50 V</strong> is applied across it?
+            How much energy is consumed in <strong>5 minutes</strong>?
+        </p>
+
+        <div class="known-values">
+            <div class="value-box">
+                <div>Resistance</div>
+                <div class="value">100</div>
+                <div class="unit">Ω</div>
+            </div>
+
+            <div class="value-box">
+                <div>Voltage</div>
+                <div class="value">50</div>
+                <div class="unit">V</div>
+            </div>
+
+            <div class="value-box">
+                <div>Time</div>
+                <div class="value">300</div>
+                <div class="unit">s</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+
+        <!-- LEFT -->
+        <div class="card">
+
+            <div class="section-title">Simple Resistor Circuit</div>
+
+            <div class="circuit-wrap">
+                <svg viewBox="0 0 600 240">
+
+                    <!-- Wires -->
+                    <path class="wire"
+                          d="M60 120 L180 120" />
+
+                    <path class="wire"
+                          d="M420 120 L540 120" />
+
+                    <path class="wire"
+                          d="M540 120 L540 200 L60 200 L60 120" />
+
+                    <!-- Battery -->
+                    <line x1="120" y1="70" x2="120" y2="170"
+                          stroke="#0f172a" stroke-width="5"/>
+                    <line x1="145" y1="90" x2="145" y2="150"
+                          stroke="#0f172a" stroke-width="3"/>
+
+                    <text x="105" y="55" font-size="22" fill="#334155">50 V</text>
+
+                    <!-- Resistor -->
+                    <polyline class="resistor"
+                        points="
+                        180,120
+                        205,95
+                        230,145
+                        255,95
+                        280,145
+                        305,95
+                        330,145
+                        355,95
+                        380,145
+                        420,120
+                        " />
+
+                    <text x="250" y="70"
+                          font-size="22"
+                          fill="#ef4444">100 Ω</text>
+
+                    <!-- Moving electron -->
+                    <circle class="electron" cx="80" cy="120" r="8"></circle>
+
+                </svg>
+            </div>
+
+            <div class="section-title">Power Formula</div>
+
+            <div class="formula glow">
+                <div class="math">P = V² / R</div>
+                <div>Power = Voltage squared divided by Resistance</div>
+            </div>
+
+            <div class="steps" id="powerSteps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Use the formula:
+                    <div class="equation">P = V² / R</div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Substitute the values:
+                    <div class="equation">P = 50² / 100</div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Calculate the numerator:
+                    <div class="equation">P = 2500 / 100</div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">4</span>
+                    Final power:
+                    <div class="equation highlight">P = 25 W</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT -->
+        <div class="card">
+
+            <div class="section-title">Energy Formula</div>
+
+            <div class="formula glow">
+                <div class="math">E = P × t</div>
+                <div>Energy = Power multiplied by Time</div>
+            </div>
+
+            <div class="steps" id="energySteps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    Use the formula:
+                    <div class="equation">E = P × t</div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">2</span>
+                    Substitute the values:
+                    <div class="equation">E = 25 × 300</div>
+                </div>
+
+                <div class="step">
+                    <span class="step-number">3</span>
+                    Multiply:
+                    <div class="equation highlight">E = 7500 J</div>
+                </div>
+            </div>
+
+            <div class="section-title" style="margin-top:30px;">
+                Interactive Calculator
+            </div>
+
+            <div class="controls">
+
+                <div class="control">
+                    <label>
+                        Voltage (V)
+                        <span id="voltageLabel">50 V</span>
+                    </label>
+                    <input type="range" id="voltage" min="1" max="300" value="50">
+                </div>
+
+                <div class="control">
+                    <label>
+                        Resistance (Ω)
+                        <span id="resistanceLabel">100 Ω</span>
+                    </label>
+                    <input type="range" id="resistance" min="1" max="500" value="100">
+                </div>
+
+                <div class="control">
+                    <label>
+                        Time (s)
+                        <span id="timeLabel">300 s</span>
+                    </label>
+                    <input type="range" id="time" min="1" max="3600" value="300">
+                </div>
+
+            </div>
+
+            <div class="live-results">
+
+                <div class="result-card">
+                    <div>Power</div>
+                    <div class="result-value" id="livePower">25 W</div>
+                    <div class="unit">Watts (W)</div>
+                </div>
+
+                <div class="result-card">
+                    <div>Energy</div>
+                    <div class="result-value" id="liveEnergy">7500 J</div>
+                    <div class="unit">Joules (J)</div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <div class="summary fade">
+        <h3>Final Summary</h3>
+
+        <div class="summary-grid">
+
+            <div class="summary-box">
+                <div>Power Dissipated</div>
+                <div class="big" id="summaryPower">25 W</div>
+            </div>
+
+            <div class="summary-box">
+                <div>Energy Consumed</div>
+                <div class="big" id="summaryEnergy">7500 J</div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="footer-note">
+        Formulas used:
+        <strong>P = V² / R</strong> and
+        <strong>E = P × t</strong>
+    </div>
+
+</div>
+
+<script>
+
+    // Animate steps one by one
+    function revealSteps(containerId, delay = 800){
+        const steps = document.querySelectorAll(`#${containerId} .step`);
+
+        steps.forEach((step, index)=>{
+            setTimeout(()=>{
+                step.classList.add('show');
+            }, delay * (index + 1));
+        });
+    }
+
+    revealSteps("powerSteps", 900);
+    revealSteps("energySteps", 1000);
+
+    // Interactive calculator
+    const voltageSlider = document.getElementById('voltage');
+    const resistanceSlider = document.getElementById('resistance');
+    const timeSlider = document.getElementById('time');
+
+    const voltageLabel = document.getElementById('voltageLabel');
+    const resistanceLabel = document.getElementById('resistanceLabel');
+    const timeLabel = document.getElementById('timeLabel');
+
+    const livePower = document.getElementById('livePower');
+    const liveEnergy = document.getElementById('liveEnergy');
+
+    const summaryPower = document.getElementById('summaryPower');
+    const summaryEnergy = document.getElementById('summaryEnergy');
+
+    function updateCalculations(){
+
+        const V = parseFloat(voltageSlider.value);
+        const R = parseFloat(resistanceSlider.value);
+        const t = parseFloat(timeSlider.value);
+
+        const P = (V * V) / R;
+        const E = P * t;
+
+        voltageLabel.textContent = `${V} V`;
+        resistanceLabel.textContent = `${R} Ω`;
+        timeLabel.textContent = `${t} s`;
+
+        livePower.textContent = `${P.toFixed(2)} W`;
+        liveEnergy.textContent = `${E.toFixed(2)} J`;
+
+        summaryPower.textContent = `${P.toFixed(2)} W`;
+        summaryEnergy.textContent = `${E.toFixed(2)} J`;
+    }
+
+    voltageSlider.addEventListener('input', updateCalculations);
+    resistanceSlider.addEventListener('input', updateCalculations);
+    timeSlider.addEventListener('input', updateCalculations);
+
+    updateCalculations();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AC Current and Voltage Visualizer</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --panel-2:#0b1220;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --grid:rgba(148,163,184,.18);
+      --axis:#cbd5e1;
+      --current:#38bdf8;
+      --voltage:#f59e0b;
+      --accent:#22c55e;
+      --card-shadow: 0 20px 60px rgba(0,0,0,.35);
+      --border: 1px solid rgba(148,163,184,.15);
+      --radius: 18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,.15), transparent 35%),
+        radial-gradient(circle at top right, rgba(34,197,94,.12), transparent 30%),
+        linear-gradient(180deg, #0b1020 0%, var(--bg) 100%);
+      color:var(--text);
+      min-height:100vh;
+    }
+
+    .wrap{
+      max-width:1200px;
+      margin:0 auto;
+      padding:24px;
+    }
+
+    .hero{
+      background:linear-gradient(180deg, rgba(17,24,39,.92), rgba(15,23,42,.92));
+      border:var(--border);
+      border-radius:24px;
+      box-shadow:var(--card-shadow);
+      overflow:hidden;
+    }
+
+    .topbar{
+      padding:26px 26px 18px;
+      border-bottom:var(--border);
+      background:linear-gradient(90deg, rgba(56,189,248,.08), rgba(245,158,11,.06));
+    }
+
+    h1{
+      margin:0 0 10px;
+      font-size:clamp(1.7rem, 3vw, 2.4rem);
+      line-height:1.1;
+      letter-spacing:-0.03em;
+    }
+
+    .subtitle{
+      color:var(--muted);
+      font-size:0.98rem;
+      max-width:900px;
+      line-height:1.55;
+    }
+
+    .formula-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:14px;
+      margin-top:20px;
+    }
+
+    .formula{
+      padding:14px 16px;
+      border-radius:16px;
+      background:rgba(2,6,23,.35);
+      border:var(--border);
+      font-size:1rem;
+      line-height:1.55;
+    }
+
+    .formula strong{
+      display:inline-block;
+      margin-bottom:6px;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:14px;
+      margin-top:18px;
+    }
+
+    .stat{
+      background:rgba(2,6,23,.35);
+      border:var(--border);
+      border-radius:16px;
+      padding:14px 16px;
+    }
+
+    .stat .label{
+      color:var(--muted);
+      font-size:.86rem;
+      margin-bottom:6px;
+    }
+
+    .stat .value{
+      font-size:1.25rem;
+      font-weight:700;
+      letter-spacing:-0.02em;
+    }
+
+    .content{
+      display:grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(260px, 0.9fr);
+      gap:18px;
+      padding:18px;
+    }
+
+    .chart-card, .side-card, .explain{
+      background:rgba(2,6,23,.32);
+      border:var(--border);
+      border-radius:var(--radius);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+    }
+
+    .chart-card{
+      padding:14px;
+      min-width:0;
+    }
+
+    .chart-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:6px 6px 12px;
+    }
+
+    .chart-title{
+      font-size:1.02rem;
+      font-weight:600;
+    }
+
+    .legend{
+      display:flex;
+      gap:14px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+
+    .legend span{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .swatch{
+      width:14px;
+      height:14px;
+      border-radius:999px;
+      display:inline-block;
+    }
+
+    .chart-shell{
+      position:relative;
+      width:100%;
+      aspect-ratio: 16 / 9;
+      min-height:320px;
+      border-radius:18px;
+      overflow:hidden;
+      background:
+        radial-gradient(circle at center, rgba(59,130,246,.05), transparent 60%),
+        linear-gradient(180deg, rgba(15,23,42,.72), rgba(2,6,23,.55));
+      border:1px solid rgba(148,163,184,.12);
+    }
+
+    svg{
+      width:100%;
+      height:100%;
+      display:block;
+    }
+
+    .side-card{
+      padding:18px;
+    }
+
+    .control{
+      margin-bottom:18px;
+    }
+
+    .control label{
+      display:flex;
+      justify-content:space-between;
+      align-items:baseline;
+      gap:12px;
+      font-size:.95rem;
+      margin-bottom:10px;
+    }
+
+    .control .name{
+      font-weight:600;
+    }
+
+    .control .readout{
+      color:var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"]{
+      width:100%;
+      accent-color: var(--current);
+    }
+
+    .mini-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:10px;
+    }
+
+    .pill{
+      background:rgba(15,23,42,.68);
+      border:var(--border);
+      border-radius:14px;
+      padding:12px;
+    }
+
+    .pill .k{
+      color:var(--muted);
+      font-size:.82rem;
+      margin-bottom:4px;
+    }
+
+    .pill .v{
+      font-weight:700;
+      font-size:1.05rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .explain{
+      margin:0 18px 18px;
+      padding:18px;
+      color:#dbeafe;
+      line-height:1.65;
+    }
+
+    .explain h2{
+      margin:0 0 8px;
+      font-size:1.05rem;
+    }
+
+    .muted{
+      color:var(--muted);
+    }
+
+    .axis-label, .tick-label{
+      font-size:12px;
+      fill:var(--muted);
+    }
+
+    .axis-line{
+      stroke:var(--axis);
+      stroke-width:1.2;
+      opacity:.95;
+    }
+
+    .grid-line{
+      stroke:var(--grid);
+      stroke-width:1;
+    }
+
+    .current-line{
+      fill:none;
+      stroke:var(--current);
+      stroke-width:3.2;
+      stroke-linejoin:round;
+      stroke-linecap:round;
+      filter: drop-shadow(0 0 6px rgba(56,189,248,.25));
+    }
+
+    .voltage-line{
+      fill:none;
+      stroke:var(--voltage);
+      stroke-width:3.2;
+      stroke-linejoin:round;
+      stroke-linecap:round;
+      filter: drop-shadow(0 0 6px rgba(245,158,11,.18));
+    }
+
+    .marker{
+      stroke:rgba(255,255,255,.6);
+      stroke-dasharray:6 6;
+      stroke-width:1.4;
+    }
+
+    .marker-dot{
+      stroke:#fff;
+      stroke-width:2;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid rgba(148,163,184,.18);
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(15,23,42,.55);
+      color:#dbeafe;
+      font-size:.9rem;
+    }
+
+    @media (max-width: 900px){
+      .formula-grid, .stats, .content{
+        grid-template-columns:1fr;
+      }
+      .chart-shell{ aspect-ratio: 4 / 3; }
+    }
+
+    @media (max-width: 640px){
+      .wrap{ padding:14px; }
+      .topbar, .side-card, .chart-card, .explain{ padding:14px; }
+      .chart-head{ flex-direction:column; align-items:flex-start; }
+      h1{ font-size:1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="topbar">
+        <h1>AC Current and Voltage Visualizer</h1>
+        <div class="subtitle">
+          A clean, interactive view of two synchronized sine waves for a resistor. The current and voltage are in phase, and the animation shows the waveform advancing in time.
+        </div>
+
+        <div class="formula-grid">
+          <div class="formula">
+            <strong>Current</strong><br>
+            I(t) = 2 sin(120πt) A
+          </div>
+          <div class="formula">
+            <strong>Voltage</strong><br>
+            V(t) = 100 sin(120πt) V
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Resistor</div>
+            <div class="value">R = 50 Ω</div>
+          </div>
+          <div class="stat">
+            <div class="label">Relation</div>
+            <div class="value">V = IR</div>
+          </div>
+          <div class="stat">
+            <div class="label">Phase</div>
+            <div class="value">In phase</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="chart-title">Waveforms on a shared time axis</div>
+            <div class="legend">
+              <span><i class="swatch" style="background:var(--current)"></i>Current</span>
+              <span><i class="swatch" style="background:var(--voltage)"></i>Voltage</span>
+              <span class="badge">Animated time marker</span>
+            </div>
+          </div>
+
+          <div class="chart-shell">
+            <svg id="chart" viewBox="0 0 1000 620" preserveAspectRatio="none" aria-label="Waveform plot">
+              <defs>
+                <linearGradient id="areaGlow" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(56,189,248,.08)"/>
+                  <stop offset="100%" stop-color="rgba(56,189,248,0)"/>
+                </linearGradient>
+              </defs>
+
+              <!-- grid and axes are inserted by JavaScript -->
+              <g id="grid"></g>
+              <g id="plot"></g>
+              <g id="axes"></g>
+
+              <g id="markerGroup">
+                <line id="timeMarker" class="marker" x1="0" y1="0" x2="0" y2="0"></line>
+                <circle id="timeDotI" class="marker-dot" r="5" fill="var(--current)"></circle>
+                <circle id="timeDotV" class="marker-dot" r="5" fill="var(--voltage)"></circle>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <aside class="side-card">
+          <div class="control">
+            <label for="speed">
+              <span class="name">Animation speed</span>
+              <span class="readout" id="speedReadout">1.0×</span>
+            </label>
+            <input id="speed" type="range" min="0.25" max="2" step="0.05" value="1">
+          </div>
+
+          <div class="control">
+            <label for="window">
+              <span class="name">Time window</span>
+              <span class="readout" id="windowReadout">33.3 ms</span>
+            </label>
+            <input id="window" type="range" min="1" max="6" step="0.1" value="2">
+          </div>
+
+          <div class="mini-grid">
+            <div class="pill">
+              <div class="k">Current amplitude</div>
+              <div class="v">2 A</div>
+            </div>
+            <div class="pill">
+              <div class="k">Voltage amplitude</div>
+              <div class="v">100 V</div>
+            </div>
+            <div class="pill">
+              <div class="k">Angular frequency</div>
+              <div class="v">120π rad/s</div>
+            </div>
+            <div class="pill">
+              <div class="k">Frequency</div>
+              <div class="v">60 Hz</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="explain">
+        <h2>What the graph shows</h2>
+        <div class="muted">
+          The voltage and current follow the same sine wave, so they rise and fall together. Because the resistor obeys V = IR and R = 50 Ω, a 2 A current produces a 100 V voltage. The moving marker shows the current point in time, and the plotted curves update smoothly to make the relationship easy to see.
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const svg = document.getElementById('chart');
+      const gridG = document.getElementById('grid');
+      const plotG = document.getElementById('plot');
+      const axesG = document.getElementById('axes');
+      const timeMarker = document.getElementById('timeMarker');
+      const timeDotI = document.getElementById('timeDotI');
+      const timeDotV = document.getElementById('timeDotV');
+      const speedInput = document.getElementById('speed');
+      const windowInput = document.getElementById('window');
+      const speedReadout = document.getElementById('speedReadout');
+      const windowReadout = document.getElementById('windowReadout');
+
+      const W = 1000;
+      const H = 620;
+      const m = { top: 44, right: 100, bottom: 66, left: 84 };
+      const plot = {
+        x: m.left,
+        y: m.top,
+        w: W - m.left - m.right,
+        h: H - m.top - m.bottom
+      };
+
+      const omega = 120 * Math.PI; // rad/s
+      const currentAmp = 2;
+      const voltageAmp = 100;
+      const currentYMax = 2.2;
+      const voltageYMax = 110;
+
+      function fmtMs(s) {
+        return (s * 1000).toFixed(1) + ' ms';
+      }
+
+      function xScale(t, t0, span) {
+        return plot.x + ((t - t0) / span) * plot.w;
+      }
+
+      function mapY(value, maxAbs) {
+        const pad = 0.08 * plot.h;
+        const top = plot.y + pad;
+        const bottom = plot.y + plot.h - pad;
+        const center = (top + bottom) / 2;
+        const half = (bottom - top) / 2;
+        return center - (value / maxAbs) * half;
+      }
+
+      function clear(node) {
+        while (node.firstChild) node.removeChild(node.firstChild);
+      }
+
+      function el(name, attrs = {}) {
+        const n = document.createElementNS('http://www.w3.org/2000/svg', name);
+        for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+        return n;
+      }
+
+      function buildAxes() {
+        clear(gridG);
+        clear(axesG);
+
+        // Grid lines
+        const vLines = 10;
+        const hLines = 6;
+        for (let i = 0; i <= vLines; i++) {
+          const x = plot.x + (plot.w * i / vLines);
+          gridG.appendChild(el('line', { x1: x, y1: plot.y, x2: x, y2: plot.y + plot.h, class: 'grid-line' }));
+        }
+        for (let i = 0; i <= hLines; i++) {
+          const y = plot.y + (plot.h * i / hLines);
+          gridG.appendChild(el('line', { x1: plot.x, y1: y, x2: plot.x + plot.w, y2: y, class: 'grid-line' }));
+        }
+
+        // Axes
+        axesG.appendChild(el('line', { x1: plot.x, y1: plot.y, x2: plot.x, y2: plot.y + plot.h, class: 'axis-line' }));
+        axesG.appendChild(el('line', { x1: plot.x, y1: plot.y + plot.h, x2: plot.x + plot.w, y2: plot.y + plot.h, class: 'axis-line' }));
+        axesG.appendChild(el('line', { x1: plot.x + plot.w, y1: plot.y, x2: plot.x + plot.w, y2: plot.y + plot.h, class: 'axis-line' }));
+
+        // Axis labels
+        const labels = [
+          { x: plot.x + plot.w / 2, y: H - 14, text: 'time (s)', anchor: 'middle' },
+          { x: 22, y: plot.y + plot.h / 2, text: 'current (A)', anchor: 'middle', rotate: -90 },
+          { x: W - 22, y: plot.y + plot.h / 2, text: 'voltage (V)', anchor: 'middle', rotate: 90 }
+        ];
+        for (const label of labels) {
+          const t = el('text', {
+            x: label.x,
+            y: label.y,
+            class: 'axis-label',
+            'text-anchor': label.anchor,
+            'dominant-baseline': 'middle'
+          });
+          if (label.rotate) t.setAttribute('transform', `rotate(${label.rotate} ${label.x} ${label.y})`);
+          t.textContent = label.text;
+          axesG.appendChild(t);
+        }
+
+        // Tick labels
+        const tMax = 0.04; // 40 ms
+        for (let i = 0; i <= 4; i++) {
+          const t = i * 0.01;
+          const x = plot.x + (t / tMax) * plot.w;
+          const tick = el('text', { x, y: plot.y + plot.h + 24, class: 'tick-label', 'text-anchor': 'middle' });
+          tick.textContent = (t * 1000).toFixed(0) + ' ms';
+          axesG.appendChild(tick);
+          axesG.appendChild(el('line', { x1: x, y1: plot.y + plot.h, x2: x, y2: plot.y + plot.h + 6, class: 'axis-line' }));
+        }
+
+        const currentTicks = [-2, -1, 0, 1, 2];
+        for (const val of currentTicks) {
+          const y = mapY(val, currentYMax);
+          const tick = el('text', { x: plot.x - 14, y, class: 'tick-label', 'text-anchor': 'end', 'dominant-baseline': 'middle' });
+          tick.textContent = val.toFixed(0);
+          axesG.appendChild(tick);
+        }
+
+        const voltageTicks = [-100, -50, 0, 50, 100];
+        for (const val of voltageTicks) {
+          const y = mapY(val, voltageYMax);
+          const tick = el('text', { x: plot.x + plot.w + 14, y, class: 'tick-label', 'text-anchor': 'start', 'dominant-baseline': 'middle' });
+          tick.textContent = val.toFixed(0);
+          axesG.appendChild(tick);
+        }
+
+        // Axis side titles
+        const leftTitle = el('text', { x: plot.x - 52, y: plot.y - 4, class: 'axis-label', 'text-anchor': 'start' });
+        leftTitle.textContent = 'A';
+        axesG.appendChild(leftTitle);
+        const rightTitle = el('text', { x: plot.x + plot.w + 28, y: plot.y - 4, class: 'axis-label', 'text-anchor': 'start' });
+        rightTitle.textContent = 'V';
+        axesG.appendChild(rightTitle);
+      }
+
+      function polylineFrom(fn, t0, span, n, yMax) {
+        let pts = '';
+        for (let i = 0; i <= n; i++) {
+          const t = t0 + (span * i / n);
+          const x = xScale(t, t0, span).toFixed(2);
+          const y = mapY(fn(t), yMax).toFixed(2);
+          pts += `${x},${y} `;
+        }
+        return pts.trim();
+      }
+
+      function buildWaveforms(nowSeconds) {
+        clear(plotG);
+
+        const cycles = parseFloat(windowInput.value);
+        const span = cycles / 60; // seconds shown across the chart
+        const t0 = nowSeconds - span;
+
+        // Waveforms
+        const current = t => currentAmp * Math.sin(omega * t);
+        const voltage = t => voltageAmp * Math.sin(omega * t);
+
+        const currentLine = el('polyline', {
+          points: polylineFrom(current, t0, span, 480, currentYMax),
+          class: 'current-line'
+        });
+
+        const voltageLine = el('polyline', {
+          points: polylineFrom(voltage, t0, span, 480, voltageYMax),
+          class: 'voltage-line'
+        });
+
+        plotG.appendChild(voltageLine);
+        plotG.appendChild(currentLine);
+
+        // Current moving marker at the right edge
+        const tMarker = nowSeconds;
+        const x = xScale(tMarker, t0, span);
+        const iVal = current(tMarker);
+        const vVal = voltage(tMarker);
+        const yI = mapY(iVal, currentYMax);
+        const yV = mapY(vVal, voltageYMax);
+
+        timeMarker.setAttribute('x1', x);
+        timeMarker.setAttribute('x2', x);
+        timeMarker.setAttribute('y1', plot.y);
+        timeMarker.setAttribute('y2', plot.y + plot.h);
+
+        timeDotI.setAttribute('cx', x);
+        timeDotI.setAttribute('cy', yI);
+        timeDotV.setAttribute('cx', x);
+        timeDotV.setAttribute('cy', yV);
+
+        // Make sure the markers render above the lines
+        svg.appendChild(timeMarker.parentNode);
+      }
+
+      let start = performance.now();
+      function animate(nowMs) {
+        const speed = parseFloat(speedInput.value);
+        const nowSeconds = ((nowMs - start) / 1000) * speed;
+        speedReadout.textContent = speed.toFixed(2).replace(/\.00$/, '.0') + '×';
+        windowReadout.textContent = fmtMs(parseFloat(windowInput.value) / 60);
+        buildWaveforms(nowSeconds);
+        requestAnimationFrame(animate);
+      }
+
+      speedInput.addEventListener('input', () => {
+        speedReadout.textContent = parseFloat(speedInput.value).toFixed(2).replace(/\.00$/, '.0') + '×';
+      });
+      windowInput.addEventListener('input', () => {
+        windowReadout.textContent = fmtMs(parseFloat(windowInput.value) / 60);
+      });
+
+      buildAxes();
+      requestAnimationFrame(animate);
+
+      window.addEventListener('resize', buildAxes);
+    })();
+  </script>
+</body>
+</html>
